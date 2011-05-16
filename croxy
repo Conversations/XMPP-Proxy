@@ -1,0 +1,29 @@
+#!/usr/bin/env lua
+
+--- Create global proxy object
+local croxy = { }
+_G.croxy = croxy
+
+function load_luarocks()
+  --- load luarocks, for development we need this
+  --- to get all modules
+  pcall(require, "luarocks.loader")
+end
+
+function load_events()
+  local events = require("util.events")
+  _G.croxy.events = events.new()
+end
+
+function load_logging()
+  require("core.loggingmanager")
+end
+
+load_luarocks()
+load_events()
+load_logging()
+
+local log = croxy.log
+
+log("error", "Test")
+log("debug", "Blub")
