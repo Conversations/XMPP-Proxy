@@ -4,10 +4,23 @@
 local croxy = { }
 _G.croxy = croxy
 
+local log
+local events
+local server
+local socket
+
+--
+-- Loading functions for setup
+--
 function load_luarocks()
   --- load luarocks, for development we need this
   --- to get all modules
   pcall(require, "luarocks.loader")
+end
+
+function load_libraries()
+	socket = require "socket"
+	server = require "net.server"
 end
 
 function load_events()
@@ -19,11 +32,55 @@ function load_logging()
   require("core.loggingmanager")
 end
 
+---
+--- Run functions
+---
+function loop()
+  ---
+  -- Catch an interrupted error here
+  -- and return quitting to end the loop.
+  -- Otherwise wait a short period and try again
+  ---
+  local function catch_uncaught_error(err)
+		if type(err) == "string" and err:match("interrupted!$") then
+			return "quitting";
+		end
+		
+		log("error", "Top-level error, please report:\n%s", tostring(err));
+		local traceback = debug.traceback("", 2);
+		if traceback then
+			log("error", "%s", traceback);
+		end
+	end
+	
+	while select(2, xpcall(server.loop, catch_uncaught_error)) ~= "quitting" do
+		socket.sleep(0.2);
+	end
+end
+
+function cleanup()
+  log("info", "Proxy stopping.")
+  events.fire_event('proxy-stopping')
+
+  log("info", "Proxy stopped.")
+  events.fire_event('proxy-stopped')
+end
+
 load_luarocks()
+load_libraries()
 load_events()
 load_logging()
 
-local log = croxy.log
+--- Set local variables, they'll be used in
+--- functions called after now
+log = croxy.log
+events = croxy.events
 
-log("error", "Test")
-log("debug", "Blub")
+log("info", "Starting proxy.")
+events.fire_event('proxy-starting')
+
+log("info", "Proxy started.")
+events.fire_event('proxy-started')
+
+loop()
+cleanup()
