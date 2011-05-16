@@ -79,6 +79,13 @@ events = croxy.events
 log("info", "Starting proxy.")
 events.fire_event('proxy-starting')
 
+listener = {}
+listener.onconnect = function(a,b,c,d)
+  print ("test",a,b,c,d)
+end
+
+server.addserver("*", 5000, listener, "", false, false)
+
 log("info", "Proxy started.")
 events.fire_event('proxy-started')
 
