@@ -1,8 +1,6 @@
 
 local croxy = _G.croxy
-local require = require
-local print = print
-local ipairs = ipairs
+local string, require, print, ipairs = string, require, print, ipairs
 
 local logger = require "util.logger"
 
@@ -25,7 +23,7 @@ function setup_sinks()
 end
 
 function log_sink(source_name, level, message, ...)
-  print (source_name, level, message, ...)
+  print (source_name, level, string.format(message, ...))
 end
 
 setup()

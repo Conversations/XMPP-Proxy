@@ -22,6 +22,11 @@ function load_libraries()
     luasec = require "ssl"
 	socket = require "socket"
 	server = require "net.server"
+	
+	require "util.xmppstream"
+	require "util.random_string"
+	require "core.sessionmanager"
+	require "net.xmppclient_listener"
 end
 
 function load_events()
@@ -31,6 +36,34 @@ end
 
 function load_logging()
   require("core.loggingmanager")
+end
+
+function setup_xmppclient()
+  local xmppclient_listener = require "net.xmppclient_listener"
+  
+  server.addserver("*", 5000, xmppclient_listener, "*a", false, false)
+end
+
+---
+-- Stolen from prosody
+---
+function init_global_protection()
+	-- Catch global accesses
+	local locked_globals_mt = {
+		__index = function (t, k) log("warn", "%s", debug.traceback("Attempt to read a non-existent global '"..tostring(k).."'", 2)); end;
+		__newindex = function (t, k, v) error("Attempt to set a global: "..tostring(k).." = "..tostring(v), 2); end;
+	};
+		
+	function croxy.unlock_globals()
+		setmetatable(_G, nil);
+	end
+	
+	function croxy.lock_globals()
+		setmetatable(_G, locked_globals_mt);
+	end
+
+	-- And lock now...
+	croxy.lock_globals();
 end
 
 ---
@@ -71,6 +104,7 @@ load_luarocks()
 load_libraries()
 load_events()
 load_logging()
+init_global_protection()
 
 --- Set local variables, they'll be used in
 --- functions called after now
@@ -80,13 +114,7 @@ events = croxy.events
 log("info", "Starting proxy.")
 events.fire_event('proxy-starting')
 
-listener = {}
-listener.onconnect = function(conn)
-  print (conn:ip(), conn:clientport())
-  conn:starttls()
-end
-
-server.addserver("*", 5000, listener, "", false, false)
+setup_xmppclient()
 
 log("info", "Proxy started.")
 events.fire_event('proxy-started')
