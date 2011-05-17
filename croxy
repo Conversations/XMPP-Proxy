@@ -19,6 +19,7 @@ function load_luarocks()
 end
 
 function load_libraries()
+    luasec = require "ssl"
 	socket = require "socket"
 	server = require "net.server"
 end
@@ -80,8 +81,9 @@ log("info", "Starting proxy.")
 events.fire_event('proxy-starting')
 
 listener = {}
-listener.onconnect = function(a,b,c,d)
-  print ("test",a,b,c,d)
+listener.onconnect = function(conn)
+  print (conn:ip(), conn:clientport())
+  conn:starttls()
 end
 
 server.addserver("*", 5000, listener, "", false, false)
