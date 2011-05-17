@@ -104,12 +104,15 @@ load_luarocks()
 load_events()
 load_libraries()
 load_logging()
-init_global_protection()
 
---- Set local variables, they'll be used in
---- functions called after now
+---
+-- Set local variables, they'll be used in
+-- functions called after now
+---
 log = croxy.log
 events = croxy.events
+
+init_global_protection()
 
 log("info", "Starting proxy.")
 events.fire_event('proxy-starting')
