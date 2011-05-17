@@ -30,7 +30,8 @@ function xmppclient.onincoming(conn, data)
     local ok, err = session.stream:feed(data)
     
     if not ok then
-      session.log("error", "Feeding stream returned error %s", err)
+      session.log("debug", "Feeding stream returned error %q. Processed bytes where: %s", err, tostring(data))
+      session:close("not-well-formed")
     end
   end
 end

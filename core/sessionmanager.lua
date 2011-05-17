@@ -5,6 +5,7 @@ local tostring, setmetatable, ipairs, pairs = tostring, setmetatable, ipairs, pa
 local xmppstream = require "util.xmppstream"
 local logger = require "util.logger"
 local random_string = require "util.random_string"
+local st = require "util.stanza"
 
 local print = print
 
@@ -42,6 +43,9 @@ Client       +--------------------------------Proxy----------------------+      
 
 ]]--
 
+session_mt = {}
+session_mt.__index = session_mt
+
 function new_session(conn, type, proxy_session)
   local session = nil
   
@@ -59,6 +63,7 @@ function new_session(conn, type, proxy_session)
   -- Create a new session
   ---
   session = {}
+  setmetatable(session, session_mt)
   
   session.notopen = true
   session.conn = conn
@@ -100,17 +105,41 @@ function new_session(conn, type, proxy_session)
   return session
 end
 
-ProxySession = {}
-ProxySession.__index = ProxySession
+function session_mt:send(t)
+  self.conn:write(tostring(t))
+end
+
+local default_stream_attr = { ["xmlns:stream"] = "http://etherx.jabber.org/streams", xmlns = "jabber:client", version = "1.0", id = "" };
+
+function session_mt:close(reason)
+  
+  if self.notopen then
+    self:send("<?xml version='1.0'?>")
+    self:send(st.stanza("stream:stream", default_stream_attr):top_tag());
+  end
+  if reason then
+    local error = st.stanza("stream:error"):tag(reason, {xmlns = 'urn:ietf:params:xml:ns:xmpp-streams' })
+  
+    self:send(error)
+    self.log("error", "Close sessions with error %s", error:pretty_print())
+  end
+  self:send("</stream:stream>")
+
+  -- Call handler
+  self.conn:close()
+end
+
+proxy_session_mt = {}
+proxy_session_mt.__index = proxy_session_mt
 
 function new_proxy_session()
   local proxy = {}
-  setmetatable(proxy, ProxySession)
+  setmetatable(proxy, proxy_session_mt)
 
   return proxy
 end
 
-function ProxySession:set_client(session)
+function proxy_session_mt:set_client(session)
 
 end
 
