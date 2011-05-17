@@ -1,16 +1,24 @@
 
-local print = print
+local print, tostring = print, tostring
 
 local sessionmanager = require "core.sessionmanager"
+local xmppstream = require "util.xmppstream"
 
 module "xmppclient_listener"
 
 local xmppclient = {}
 
+local stream_callbacks = { default_ns = "jabber:client", streamopened=sessionmanager.streamopened, streamclosed=sessionmanager.streamclosed, handlestanza=sessionmanager.handlestanza}
+
+function stream_callbacks.error(session, error, data)
+  print ("error"..tostring(session)..":"..tostring(error)..":"..tostring(data))
+end
+
 function xmppclient.onconnect(conn)
   local session = sessionmanager.new_session(conn, "client")
   
   session.log("info", "Client connected")
+  session.stream = xmppstream.new(session, stream_callbacks)
   
   conn.session = session
 end
@@ -19,13 +27,10 @@ function xmppclient.onincoming(conn, data)
   local session = conn.session
   
   if session then
-    session.log("info", data)
     local ok, err = session.stream:feed(data)
     
     if not ok then
-      print ("error", err)
-    else
-      print ("ok")
+      session.log("error", "Feeding stream returned error %s", err)
     end
   end
 end
