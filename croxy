@@ -19,6 +19,12 @@ function load_luarocks()
 end
 
 function load_libraries()
+    ---
+    -- Load all the modules here, because
+    -- globals will be locked later and
+    -- therefore disallow loading
+    ---
+
     luasec = require "ssl"
 	socket = require "socket"
 	server = require "net.server"
