@@ -101,8 +101,8 @@ function cleanup()
 end
 
 load_luarocks()
-load_libraries()
 load_events()
+load_libraries()
 load_logging()
 init_global_protection()
 

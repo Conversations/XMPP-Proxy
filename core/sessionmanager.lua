@@ -135,12 +135,15 @@ proxy_session_mt.__index = proxy_session_mt
 function new_proxy_session()
   local proxy = {}
   setmetatable(proxy, proxy_session_mt)
-
+  
+  proxy.log = logger.init("p_"..tostring(proxy):match("[a-f0-9]+$"))
+  
   return proxy
 end
 
 function proxy_session_mt:set_client(session)
-
+  session.proxy = self
+  self.client = session
 end
 
 function destroy_session(session)
@@ -165,28 +168,34 @@ end
 
 function streamclosed(session)
   session.log("info", "Stream closed")
+  session:close()
 end
 
 function handlestanza(session, stanza)
   if session.type == "client" then
-    local handled = croxy.events.fire_event('outgoing-stanza', stanza)
+    local handled = croxy.events.fire_event('outgoing-stanza', session.proxy, stanza)
     
     if handled == nil then handled = false end
     
     if not handled then
-      session.log("error", "The following stanza was not handled and will be droped: %s", stanza:pretty_print())
+      session.log("error", "The following outgoing stanza was not handled and will be droped: %s", stanza:pretty_print())
     end
   elseif session.type == "server" then
-    local handled = croxy.events.fire_event('outgoing-stanza', stanza)
+    local handled = croxy.events.fire_event('incoming-stanza', session.proxy, stanza)
     
     if handled == nil then handled = false end
     
     if not handled then
-      session.log("error", "The following stanza was not handled and will be droped: %s", stanza:pretty_print())
+      session.log("error", "The following incoming stanza was not handled and will be droped: %s", stanza:pretty_print())
     end
   else
     session.log("error", "Reviced stanza but session of type %s don't recive stanzas. Following stanza is droped: %s", session.type, stanza:pretty_print())
   end
 end
+
+function outgoing_stanza_unconnected(session, stanza)
+  session.log("error", "not connected")
+end
+croxy.events.add_handler('outgoing-stanza', outgoing_stanza_unconnected, -10)
 
 return _M
