@@ -50,6 +50,32 @@ function setup_xmppclient()
   server.addserver("*", 5000, xmppclient_listener, "*a", false, false)
 end
 
+function load_config()
+  ---
+  -- Create an config table
+  ---
+  croxy.config = {}
+  
+  ---
+  -- Fill in defaults
+  ---
+  croxy.config["interface"] = "*" -- Bind on all interfaces
+  croxy.config["port"] = 5000
+  croxy.config["host"] = "xmpp-proxy.conversations.im" -- The name of this croxy. Is used as JID to address it.
+  
+  ---
+  -- Make the config imutable and
+  -- complain about access to none-existent variables
+  ---
+  
+  setmetatable(croxy.config, {
+  	__newindex = function (t, k, v)
+  	  error("Attempt to set a new config var: "..tostring(k).." = "..tostring(v), 2)
+  	end
+  })
+  
+end
+
 ---
 -- Stolen from prosody
 ---
@@ -110,6 +136,7 @@ load_luarocks()
 load_events()
 load_libraries()
 load_logging()
+load_config()
 
 ---
 -- Set local variables, they'll be used in

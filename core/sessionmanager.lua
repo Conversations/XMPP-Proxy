@@ -164,6 +164,11 @@ end
 function streamopened(session, attr)
   session.log("info", "Stream opened")
   session.notopen = false
+  
+  ---
+  -- Send stream opening.
+  ---
+  self:send("<?xml version='1.0'?>")
 end
 
 function streamclosed(session)
