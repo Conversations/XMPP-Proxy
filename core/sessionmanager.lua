@@ -1,11 +1,12 @@
 
 local _G, croxy = _G, croxy
-local tostring, setmetatable, ipairs, pairs = tostring, setmetatable, ipairs, pairs
+local tostring, setmetatable, ipairs, pairs, type, newproxy, getmetatable = tostring, setmetatable, ipairs, pairs, type, newproxy, getmetatable
 
 local xmppstream = require "util.xmppstream"
 local logger = require "util.logger"
 local random_string = require "util.random_string"
 local st = require "util.stanza"
+local uuid_generate = require "util.uuid".generate
 
 local print = print
 
@@ -16,6 +17,12 @@ local sessions = {
 	proxy = {},
 	server = {}
 }
+
+local open_sessions = {
+	client = 0,
+	proxy = 0,
+	server = 0
+};
 
 --[[
 
@@ -43,6 +50,8 @@ Client       +--------------------------------Proxy----------------------+      
 
 ]]--
 
+local default_stream_attr = { ["xmlns:stream"] = "http://etherx.jabber.org/streams", xmlns = "jabber:client", version = "1.0", id = "" };
+
 session_mt = {}
 session_mt.__index = session_mt
 
@@ -63,6 +72,7 @@ function new_session(conn, type, proxy_session)
   -- Create a new session
   ---
   session = {}
+
   setmetatable(session, session_mt)
   
   session.notopen = true
@@ -82,8 +92,19 @@ function new_session(conn, type, proxy_session)
     croxy.log("error", tostring(conn).." try to create session that is not of type client or server. Type is "..tostring(type))
     return nil, "wrong type"
   end
+    
+  ---
+  -- Trace how many sessions we have
+  ---
   
   session.log = logger.init(logname)
+  session.trace = newproxy(true);
+  getmetatable(session.trace).__gc = function ()
+    open_sessions[type] = open_sessions[type] - 1
+  end
+  open_sessions[type] = open_sessions[type] + 1
+  
+  croxy.log("debug", "Now %d sessions of type %q exists", open_sessions[type], type)
   
   ---
   -- If the caller didn't pass an proxy_session
@@ -109,41 +130,52 @@ function session_mt:send(t)
   self.conn:write(tostring(t))
 end
 
-local default_stream_attr = { ["xmlns:stream"] = "http://etherx.jabber.org/streams", xmlns = "jabber:client", version = "1.0", id = "" };
-
-function session_mt:close(reason)
-  
-  if self.notopen then
-    self:send("<?xml version='1.0'?>")
-    self:send(st.stanza("stream:stream", default_stream_attr):top_tag());
+function session_mt:send_opening()
+  ---
+  -- Send stream opening.
+  ---
+  local stream_attr = default_stream_attr
+  stream_attr["id"] = uuid_generate()
+  if self.type == "client" then
+    stream_attr["from"] = croxy.config['host']
   end
-  if reason then
-    local error = st.stanza("stream:error"):tag(reason, {xmlns = 'urn:ietf:params:xml:ns:xmpp-streams' })
   
-    self:send(error)
-    self.log("error", "Close sessions with error %s", error:pretty_print())
+  if self.to ~= nil then
+    stream_attr["to"] = self.to
   end
-  self:send("</stream:stream>")
-
-  -- Call handler
-  self.conn:close()
+  
+  self:send("<?xml version='1.0'?>")
+  self:send(st.stanza("stream:stream", stream_attr):top_tag());
 end
 
 proxy_session_mt = {}
 proxy_session_mt.__index = proxy_session_mt
 
 function new_proxy_session()
-  local proxy = {}
-  setmetatable(proxy, proxy_session_mt)
+  local session = {}
+  setmetatable(session, proxy_session_mt)
   
-  proxy.log = logger.init("p_"..tostring(proxy):match("[a-f0-9]+$"))
+  session.log = logger.init("p_"..tostring(session):match("[a-f0-9]+$"))
+  session.secret = random_string(40, "%a%d{)(%][%_-=+}:;\|")
   
-  return proxy
+  ---
+  -- Insert the session in our session table.
+  -- the secret is the proxy for easy refinding later
+  ---
+  
+  sessions["proxy"][session.secret] = session
+    
+  return session
 end
 
 function proxy_session_mt:set_client(session)
   session.proxy = self
   self.client = session
+end
+
+function proxy_session_mt:set_server(session)
+  session.proxy = self
+  self.server = session
 end
 
 function destroy_session(session)
@@ -152,6 +184,11 @@ function destroy_session(session)
     return --- Do nothing if already destroyed
   end
   
+  if session.type ~= "proxy" then
+    sessions[session.type][session.conn] = nil
+  else
+    sessions[session.type][session.secret] = nil
+  end
 end
 
 --[[
@@ -163,12 +200,89 @@ end
 
 function streamopened(session, attr)
   session.log("info", "Stream opened")
-  session.notopen = false
+  local proxy = session.proxy
+
+  session.notopen = nil
+ 
+  ---
+  -- If we were enabling tls before (setting secure to false).
+  -- we are now secured via tls.
+  ---
+  if session.secure == false then
+    session.secure = true
+  end
+ 
+
+  if session.type == "client" then
+    ---
+    -- If the connection to the server stand
+    -- just forward the header
+    ---
+    if proxy.server and proxy.server.connected then
+      proxy.server.notopen = true
+      proxy.server.stream:reset()
+    
+      proxy.server:send("<?xml version='1.0'?>")
+      attr["xmlns:stream"] = 'http://etherx.jabber.org/streams'
+      attr["xmlns"] = "jabber:client"
+      proxy.server:send(st.stanza("stream:stream", attr):top_tag())
+      return
+    else
+      streamopened_client(session, attr)
+    end
+  end
+  
+  if session.type == "server" then
+    if proxy.server.connected then
+      proxy.client:send("<?xml version='1.0'?>")
+      proxy.client:send(st.stanza("stream:stream", attr):top_tag())
+      return
+    else
+      streamopened_server(session, attr)
+    end
+  end
+  
+  session.log("debug", "test")
+end
+
+function streamopened_client(session, attr)
+  local host = attr.to
+
+  if not host then
+    session:close{
+      condition = "improper-addressing",
+	  text = "A 'to' attribute is required on stream headers"
+	};
+    return;
+  end
+  
+  if host ~= croxy.config['host'] then
+    session:close{
+      condition = "host-unknown",
+      text = "This server does not serve "..tostring(host)
+    };
+    return
+  end
+  
+  session.from = attr.from
+  
+  session:send_opening()
   
   ---
-  -- Send stream opening.
+  -- Compose the proxy-stream features.
+  -- they will be replaced later with the stream features of
+  -- the server.
   ---
-  self:send("<?xml version='1.0'?>")
+  local features = st.stanza("stream:features");
+  
+  croxy.events.fire_event('stream-features', session, features)
+  
+  session:send(features)
+end
+
+function streamopened_server(session, attr)
+  -- Do nothing for now
+  session.log("debug", "streamopened_server")
 end
 
 function streamclosed(session)
@@ -176,18 +290,39 @@ function streamclosed(session)
   session:close()
 end
 
+local function eventname_from_stanza(stanza)
+  if stanza.attr.xmlns == nil then
+    if stanza.name == "iq" and (stanza.attr.type == "set" or stanza.attr.type == "get") then
+      event = "/iq/"..stanza.tags[1].attr.xmlns..":"..stanza.tags[1].name;
+    else
+      event = "/"..stanza.name;
+    end
+  else
+    event = "/"..stanza.attr.xmlns..":"..stanza.name;
+  end
+
+  return event
+end
+
 function handlestanza(session, stanza)
+
   if session.type == "client" then
-    local handled = croxy.events.fire_event('outgoing-stanza', session.proxy, stanza)
-    
-    if handled == nil then handled = false end
-    
+    local handled = croxy.events.fire_event('outgoing-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
+        
+    if not handled then
+      handled = croxy.events.fire_event('outgoing-stanza', session.proxy, stanza)
+    end
+        
     if not handled then
       session.log("error", "The following outgoing stanza was not handled and will be droped: %s", stanza:pretty_print())
     end
   elseif session.type == "server" then
-    local handled = croxy.events.fire_event('incoming-stanza', session.proxy, stanza)
+    local handled = croxy.events.fire_event('incoming-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
     
+    if not handled then
+      handled = croxy.events.fire_event('incoming-stanza', session.proxy, stanza)
+    end
+      
     if handled == nil then handled = false end
     
     if not handled then
@@ -198,9 +333,29 @@ function handlestanza(session, stanza)
   end
 end
 
-function outgoing_stanza_unconnected(session, stanza)
-  session.log("error", "not connected")
+function outgoing_stanza_route(session, stanza)
+  if not session.server or not session.server.connected then
+    session.log("error", "not connected")
+    return
+  end
+  
+  session.server:send(stanza)
+  
+  return true
 end
-croxy.events.add_handler('outgoing-stanza', outgoing_stanza_unconnected, -10)
+
+function incoming_stanza_route(session, stanza)
+  if not session.server or not session.server.connected then
+    session.log("error", "not connected")
+    return
+  end
+  
+  session.client:send(stanza)
+  
+  return true
+end
+
+croxy.events.add_handler('outgoing-stanza', outgoing_stanza_route, -10)
+croxy.events.add_handler('incoming-stanza', incoming_stanza_route, -10)
 
 return _M

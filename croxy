@@ -33,6 +33,7 @@ function load_libraries()
 	require "util.random_string"
 	require "core.sessionmanager"
 	require "net.xmppclient_listener"
+	require "net.xmppserver_listener"
 end
 
 function load_events()
@@ -50,6 +51,10 @@ function setup_xmppclient()
   server.addserver("*", 5000, xmppclient_listener, "*a", false, false)
 end
 
+function seed_random()
+  math.randomseed( tonumber(tostring(os.time()):reverse():sub(1,6)) )
+end
+
 function load_config()
   ---
   -- Create an config table
@@ -62,6 +67,7 @@ function load_config()
   croxy.config["interface"] = "*" -- Bind on all interfaces
   croxy.config["port"] = 5000
   croxy.config["host"] = "xmpp-proxy.conversations.im" -- The name of this croxy. Is used as JID to address it.
+  croxy.config["require-client-encryption"] = true -- Only accept connections encrypted via tls
   
   ---
   -- Make the config imutable and
@@ -74,6 +80,11 @@ function load_config()
   	end
   })
   
+end
+
+function load_modules()
+  require "modules.mod_tls"
+  require "modules.mod_xmpp_proxy"
 end
 
 ---
@@ -137,6 +148,9 @@ load_events()
 load_libraries()
 load_logging()
 load_config()
+seed_random()
+
+load_modules()
 
 ---
 -- Set local variables, they'll be used in

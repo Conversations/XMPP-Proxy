@@ -1,13 +1,14 @@
 
 local print, tostring, type = print, tostring, type
 
+local croxy = croxy
 local sessionmanager = require "core.sessionmanager"
 local xmppstream = require "util.xmppstream"
 local st = require "util.stanza"
 
-module "xmppclient_listener"
+module "xmppclient_server"
 
-local xmppclient = {}
+local xmppserver = {}
 
 local stream_callbacks = { default_ns = "jabber:client", streamopened=sessionmanager.streamopened, streamclosed=sessionmanager.streamclosed, handlestanza=sessionmanager.handlestanza}
 local stream_xmlns_attr = {xmlns = 'urn:ietf:params:xml:ns:xmpp-streams' }
@@ -32,13 +33,13 @@ function session_close(self, reason)
     end
   
     self:send(error_stanza)
-    self.log("error", "Disconnect client with error: %s", error_stanza:pretty_print())
+    self.log("error", "Disconnect from server with error: %s", error_stanza:pretty_print())
   end
   self:send("</stream:stream>")
 
   -- Call handler
   self.conn:close()
-  xmppclient.ondisconnect(self.conn)
+  xmppserver.ondisconnect(self.conn)
   
   sessionmanager.destroy_session(self)
 end
@@ -47,17 +48,18 @@ function stream_callbacks.error(session, error, data)
   print ("error"..tostring(session)..":"..tostring(error)..":"..tostring(data))
 end
 
-function xmppclient.onconnect(conn)
-  local session = sessionmanager.new_session(conn, "client")
-  
-  session.log("info", "Client connected")
+function xmppserver.onconnect(conn)
+  local session = conn.session
+
+  session.log("info", "Connected to Server")
+  session.not_open = true
   session.stream = xmppstream.new(session, stream_callbacks)
   session.close = session_close
   
-  conn.session = session
+  croxy.events.fire_event('server-connected', session.proxy)
 end
 
-function xmppclient.onincoming(conn, data)
+function xmppserver.onincoming(conn, data)
   local session = conn.session
   
   if session then
@@ -70,12 +72,22 @@ function xmppclient.onincoming(conn, data)
   end
 end
 
-function xmppclient.ondisconnect(conn, err)
+function xmppserver.ondisconnect(conn, err)
   local session = conn.session
   
   conn.session =  nil
   
-  session.log("info", "Client disconnected")
+  session.log("info", "Disconnected from Server")
 end
 
-return xmppclient
+function xmppserver.onstatus(conn, status)
+  local session = conn.session
+    
+  if status == "ssl-handshake-complete" then
+    session.secure = true
+  
+    croxy.events.fire_event('server-connected', session.proxy)
+  end
+end
+
+return xmppserver

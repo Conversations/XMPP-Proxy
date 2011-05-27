@@ -102,6 +102,18 @@ function new_sax_handlers(session, stream_callbacks)
 				end
 				return;
 			end
+			
+			if session.allows_stream_restarts then
+				if tagname == stream_tag then
+					non_streamns_depth = 0;
+					if cb_streamopened then
+						cb_streamopened(session, attr);
+					end
+					
+					return
+				end
+		    end
+			
 			if curr_ns == "jabber:client" and name ~= "iq" and name ~= "presence" and name ~= "message" then
 				cb_error(session, "invalid-top-level-element");
 			end

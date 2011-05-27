@@ -1,6 +1,6 @@
 
 local croxy = _G.croxy
-local string, require, print, ipairs = string, require, print, ipairs
+local string, require, print, ipairs, os = string, require, print, ipairs, os
 
 local termcolours = require "util.termcolours"
 local getstyle, getstring = termcolours.getstyle, termcolours.getstring
@@ -11,6 +11,7 @@ local logger = require "util.logger"
 module "loggingmanager"
 
 local logging_levels = { "debug", "info", "warn", "error", "critical" }
+local default_timestamp = "%b %d %H:%M:%S";
 
 function setup()  
   croxy.log = logger.init("general")
@@ -40,7 +41,7 @@ function log_sink(source_name, level, message, ...)
   elseif level == "critical" then level_string = getstring(style_error, "C")
   end
   
-  local message = string.format("%15s [%s] %s", source_name, level_string, string.format(message, ...))
+  local message = string.format("[%s] %15s [%s] %s", os.date(default_timestamp), source_name, level_string, string.format(message, ...))
   
   print (message)
 end
