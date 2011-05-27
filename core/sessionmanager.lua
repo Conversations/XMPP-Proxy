@@ -241,8 +241,6 @@ function streamopened(session, attr)
       streamopened_server(session, attr)
     end
   end
-  
-  session.log("debug", "test")
 end
 
 function streamopened_client(session, attr)
@@ -282,7 +280,6 @@ end
 
 function streamopened_server(session, attr)
   -- Do nothing for now
-  session.log("debug", "streamopened_server")
 end
 
 function streamclosed(session)
