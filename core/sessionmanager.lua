@@ -2,6 +2,8 @@
 local _G, croxy = _G, croxy
 local tostring, setmetatable, ipairs, pairs, type, newproxy, getmetatable = tostring, setmetatable, ipairs, pairs, type, newproxy, getmetatable
 
+local collectgarbage = collectgarbage
+
 local xmppstream = require "util.xmppstream"
 local logger = require "util.logger"
 local random_string = require "util.random_string"
@@ -89,7 +91,7 @@ function new_session(conn, type, proxy_session)
   elseif session.type == "server" then
     logname = "s_"..tostring(conn):match("[a-f0-9]+$")
   else
-    croxy.log("error", tostring(conn).." try to create session that is not of type client or server. Type is "..tostring(type))
+    croxy.log("error", tostring(conn).." try to create session that is not of type client nor server. Type is "..tostring(type))
     return nil, "wrong type"
   end
     
@@ -101,10 +103,11 @@ function new_session(conn, type, proxy_session)
   session.trace = newproxy(true);
   getmetatable(session.trace).__gc = function ()
     open_sessions[type] = open_sessions[type] - 1
+    session.log("info", "deallocated session. Now %d open sessions of type %s exists.", open_sessions[type], type)
   end
   open_sessions[type] = open_sessions[type] + 1
   
-  croxy.log("debug", "Now %d sessions of type %q exists", open_sessions[type], type)
+  croxy.log("debug", "Now %d sessions of type %s exists", open_sessions[type], type)
   
   ---
   -- If the caller didn't pass an proxy_session
@@ -169,12 +172,26 @@ function new_proxy_session()
 end
 
 function proxy_session_mt:set_client(session)
-  session.proxy = self
+  if self.client then
+    self.client.proxy = nil
+  end
+  
+  if session then
+    session.proxy = self
+  end
+  
   self.client = session
 end
 
 function proxy_session_mt:set_server(session)
-  session.proxy = self
+  if self.server then
+    self.server.proxy = nil
+  end
+  
+  if session then
+    session.proxy = self
+  end
+  
   self.server = session
 end
 
@@ -184,10 +201,21 @@ function destroy_session(session)
     return --- Do nothing if already destroyed
   end
   
+  session.destroyed = true
+  
   if session.type ~= "proxy" then
     sessions[session.type][session.conn] = nil
+    session.conn.session = nil
+    session.stream = nil
+    if session.type == "server" then
+      session.proxy:set_server(nil)
+    elseif session.type == "client" then
+      session.proxy:set_client(nil)
+    end
   else
     sessions[session.type][session.secret] = nil
+    destroy_session(session.client)
+    destroy_session(session.server)
   end
 end
 
@@ -235,6 +263,8 @@ function streamopened(session, attr)
   if session.type == "server" then
     if proxy.server.connected then
       proxy.client:send("<?xml version='1.0'?>")
+      attr["xmlns:stream"] = 'http://etherx.jabber.org/streams'
+      attr["xmlns"] = "jabber:client"
       proxy.client:send(st.stanza("stream:stream", attr):top_tag())
       return
     else

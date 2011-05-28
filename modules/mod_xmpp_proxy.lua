@@ -29,8 +29,7 @@ function handle_connect_stanza(session, stanza)
   session.log("debug", "client asks to connect to "..tostring(to).." using host "..tostring(host).." on port "..tostring(port))
   
   local conn = create_outgoing_connection(session, host, port)
-  local server = sessionmanager.new_session(conn, "server")
-  session:set_server(server)
+  local server = sessionmanager.new_session(conn, "server", session)
   conn.session = server
   
   session.server.to = to
@@ -100,6 +99,27 @@ function server_connected(session)
   session.client.allows_stream_restarts = true
 end
 
+function server_stream_error(session, error)
+  ---
+  --  The server stream failed, fail the client stream too...
+  ---
+  
+  local stanza = st.stanza("stream:error")
+  
+  for _, child in ipairs(error.tags) do
+    stanza:add_child(child):up()
+  end
+  
+  session.client:send(stanza)
+  session.client:close()
+end
+
+function client_disconnected(session)
+  session.server:close()
+end
+
+croxy.events.add_handler("client-disconnected", client_disconnected, 0)
+croxy.events.add_handler("server-stream-error", server_stream_error, 0)
 croxy.events.add_handler("stream-features", advertize_xmpp_proxy, 0)
 croxy.events.add_handler("server-connected", server_connected, 0)
 croxy.events.add_handler("outgoing-stanza/iq/urn:conversations:xmpp-proxy:xmpp-proxy", xmpp_proxy, 10)

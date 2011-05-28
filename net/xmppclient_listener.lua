@@ -1,6 +1,7 @@
 
 local print, tostring, type = print, tostring, type
 
+local croxy = croxy
 local sessionmanager = require "core.sessionmanager"
 local xmppstream = require "util.xmppstream"
 local st = require "util.stanza"
@@ -75,6 +76,7 @@ function xmppclient.ondisconnect(conn, err)
   
   conn.session =  nil
   
+  croxy.events.fire_event("client-disconnected", session.proxy)  
   session.log("info", "Client disconnected")
 end
 

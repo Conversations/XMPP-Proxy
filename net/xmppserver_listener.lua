@@ -45,7 +45,12 @@ function session_close(self, reason)
 end
 
 function stream_callbacks.error(session, error, data)
-  print ("error"..tostring(session)..":"..tostring(error)..":"..tostring(data))
+  if error == "stream-error" then
+    croxy.events.fire_event("server-stream-error", session.proxy, data)
+  else
+    croxy.events.fire_event("server-stream-failed", session.proxy, error, data)
+  end
+  print ("error"..tostring(session)..":"..tostring(error)..":"..data:pretty_print())
 end
 
 function xmppserver.onconnect(conn)
