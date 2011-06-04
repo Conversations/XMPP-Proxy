@@ -130,6 +130,7 @@ function new_session(conn, type, proxy_session)
 end
 
 function session_mt:send(t)
+  self.log("debug", '-> '..tostring(t))
   self.conn:write(tostring(t))
 end
 
@@ -292,7 +293,7 @@ function streamopened_client(session, attr)
     return
   end
   
-  session.from = attr.from
+  session.proxy.from = attr.from
   
   session:send_opening()
   
@@ -327,12 +328,13 @@ local function eventname_from_stanza(stanza)
   else
     event = "/"..stanza.attr.xmlns..":"..stanza.name;
   end
-
+  print ('eventname:', event)
   return event
 end
 
 function handlestanza(session, stanza)
-
+  session.log("debug", '<- '..tostring(stanza))
+  
   if session.type == "client" then
     local handled = croxy.events.fire_event('outgoing-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
         
@@ -344,6 +346,7 @@ function handlestanza(session, stanza)
       session.log("error", "The following outgoing stanza was not handled and will be droped: %s", stanza:pretty_print())
     end
   elseif session.type == "server" then
+  
     local handled = croxy.events.fire_event('incoming-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
     
     if not handled then

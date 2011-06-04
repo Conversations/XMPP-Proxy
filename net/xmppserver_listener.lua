@@ -61,6 +61,8 @@ function xmppserver.onconnect(conn)
   session.stream = xmppstream.new(session, stream_callbacks)
   session.close = session_close
   
+  conn:setoption('keepalive', true)
+  
   croxy.events.fire_event('server-connected', session.proxy)
 end
 

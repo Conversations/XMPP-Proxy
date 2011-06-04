@@ -76,7 +76,7 @@ function create_outgoing_connection(proxy_session, host, port)
   conn:settimeout(0);
   local success, err = conn:connect(host, port);
   if not success and err ~= "timeout" then
-    proxy_session.log("error", "could not connect to %s:%d: %s", host, port, erro)
+    proxy_session.log("error", "could not connect to %s:%d: %s", host, port, err)
 	return false, err;
   end
 
@@ -118,8 +118,25 @@ function client_disconnected(session)
   session.server:close()
 end
 
+function bind(session, stanza)
+  if #stanza.tags == 0 then
+    return
+  end
+
+  local bindElement = stanza:get_child('bind', 'urn:ietf:params:xml:ns:xmpp-bind')
+  
+  if bindElement == nil then
+    return
+  end
+
+  session.from = bindElement:get_child_text('jid')
+  
+  session.log('debug', 'got from %s', tostring(session.from))
+end
+
 croxy.events.add_handler("client-disconnected", client_disconnected, 0)
 croxy.events.add_handler("server-stream-error", server_stream_error, 0)
 croxy.events.add_handler("stream-features", advertize_xmpp_proxy, 0)
 croxy.events.add_handler("server-connected", server_connected, 0)
 croxy.events.add_handler("outgoing-stanza/iq/urn:conversations:xmpp-proxy:xmpp-proxy", xmpp_proxy, 10)
+croxy.events.add_handler("incoming-stanza/iq", bind, 10)

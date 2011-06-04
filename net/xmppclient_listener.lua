@@ -55,6 +55,8 @@ function xmppclient.onconnect(conn)
   session.stream = xmppstream.new(session, stream_callbacks)
   session.close = session_close
   
+  conn:setoption('keepalive', true)
+  
   conn.session = session
 end
 
@@ -73,6 +75,11 @@ end
 
 function xmppclient.ondisconnect(conn, err)
   local session = conn.session
+  
+  if session == nil then
+     print ("session already nil")
+     return
+  end
   
   conn.session =  nil
   

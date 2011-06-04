@@ -85,6 +85,7 @@ end
 function load_modules()
   require "modules.mod_tls"
   require "modules.mod_xmpp_proxy"
+  require "modules.mod_notifications"
 end
 
 ---
