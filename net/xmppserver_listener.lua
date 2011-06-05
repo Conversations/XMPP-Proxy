@@ -5,6 +5,7 @@ local croxy = croxy
 local sessionmanager = require "core.sessionmanager"
 local xmppstream = require "util.xmppstream"
 local st = require "util.stanza"
+local add_task = require "util.timer".add_task
 
 module "xmppclient_server"
 
@@ -63,11 +64,21 @@ function xmppserver.onconnect(conn)
   
   conn:setoption('keepalive', true)
   
+  function whitespace_keepalive()
+      session:send(" ")
+      session.log("debug", "whitespace keepalive")
+      add_task(5*60, whitespace_keepalive)
+  end
+  
+  add_task(5*60, whitespace_keepalive)
+  
   croxy.events.fire_event('server-connected', session.proxy)
 end
 
 function xmppserver.onincoming(conn, data)
   local session = conn.session
+  
+  print("raw incoming server: "..tostring(data))
   
   if session then
     local ok, err = session.stream:feed(data)
@@ -76,6 +87,8 @@ function xmppserver.onincoming(conn, data)
       session.log("debug", "Feeding stream returned error %q. Processed bytes where: %s", err, tostring(data))
       session:close("not-well-formed")
     end
+  else
+    print("connection with out session!!!")
   end
 end
 
