@@ -196,6 +196,14 @@ function proxy_session_mt:set_server(session)
   self.server = session
 end
 
+function retire_session(session)
+  for key, value in pairs(session) do
+     if key ~= "destroyed" and key ~= "type" then
+         session[key] = nil
+     end
+  end
+end
+
 function destroy_session(session)
   
   if session.destroyed then
@@ -218,6 +226,8 @@ function destroy_session(session)
     destroy_session(session.client)
     destroy_session(session.server)
   end
+  
+  retire_session(session)
 end
 
 --[[
