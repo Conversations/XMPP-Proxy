@@ -126,6 +126,8 @@ function new_session(conn, type, proxy_session)
   ---
   sessions["client"][conn] = session
   
+  croxy.events.fire_event('session-created', session)
+  
   return session
 end
 
@@ -346,7 +348,13 @@ function handlestanza(session, stanza)
   session.log("debug", '<- '..tostring(stanza))
   
   if session.type == "client" then
-    local handled = croxy.events.fire_event('outgoing-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
+    local handled
+    
+    handled = croxy.events.fire_event('outgoing-stanza-prolog', session.proxy, stanza)
+  
+    if not handled then
+      handled = croxy.events.fire_event('outgoing-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
+    end
         
     if not handled then
       handled = croxy.events.fire_event('outgoing-stanza', session.proxy, stanza)
@@ -356,8 +364,13 @@ function handlestanza(session, stanza)
       session.log("error", "The following outgoing stanza was not handled and will be droped: %s", stanza:pretty_print())
     end
   elseif session.type == "server" then
+    local handled
+    
+    handled = croxy.events.fire_event('incoming-stanza-prolog', session.proxy, stanza)
   
-    local handled = croxy.events.fire_event('incoming-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
+    if not handled then
+      handled = croxy.events.fire_event('incoming-stanza'..eventname_from_stanza(stanza), session.proxy, stanza)
+    end
     
     if not handled then
       handled = croxy.events.fire_event('incoming-stanza', session.proxy, stanza)

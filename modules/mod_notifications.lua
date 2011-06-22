@@ -43,16 +43,6 @@ function notification_gateway(session, stanza)
     session.client:send(st.reply(stanza))
 end
 
-croxy.events.add_handler("outgoing-stanza/iq/urn:conversations:notifications:0:notification-gateway", notification_gateway, 10)
-
-function client_disconnected(session)
-  session.client_disconnected = true
-  
-  return true
-end
-
-croxy.events.add_handler("client-disconnected", client_disconnected, 10)
-
 function handle_detached_message(session, stanza)
   if session.client_disconnected ~= true then
     return

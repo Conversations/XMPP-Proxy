@@ -9,6 +9,8 @@ local events
 local server
 local socket
 
+--- local config = {}; local f = loadfile("config.rc"); setfenv(f, config); f()
+
 --
 -- Loading functions for setup
 --
@@ -60,21 +62,39 @@ function load_config()
   -- Create an config table
   ---
   croxy.config = {}
+  local defaults = {}
   
   ---
   -- Fill in defaults
   ---
-  croxy.config["interface"] = "*" -- Bind on all interfaces
-  croxy.config["port"] = 5000
-  croxy.config["host"] = "xmpp-proxy.conversations.im" -- The name of this croxy. Is used as JID to address it.
-  croxy.config["require-client-encryption"] = true -- Only accept connections encrypted via tls
+  defaults["interface"] = "*" -- Bind on all interfaces
+  defaults["port"] = 5000
+  defaults["host"] = "xmpp-proxy.conversations.im" -- The name of this croxy. Is used as JID to address it.
+  defaults["require-client-encryption"] = true -- Only accept connections encrypted via tls
+  
+  
+  ---
+  -- Load config
+  ---
+  local c = loadfile("config.conf")
+  if c ~= nil then
+    setfenv(c, croxy.config)
+    c()
+  end
   
   ---
   -- Make the config imutable and
   -- complain about access to none-existent variables
   ---
   
+  setmetatable(defaults, {
+    __index = function (t, k)
+      log("warn", "%s", debug.traceback("Attempt to access non-existent config var '"..tostring(k).."'", 2))
+    end 
+  }) 
+  
   setmetatable(croxy.config, {
+    __index = defaults,
   	__newindex = function (t, k, v)
   	  error("Attempt to set a new config var: "..tostring(k).." = "..tostring(v), 2)
   	end
@@ -86,6 +106,7 @@ function load_modules()
   require "modules.mod_tls"
   require "modules.mod_xmpp_proxy"
   require "modules.mod_notifications"
+  require "modules.mod_streammanagement"
 end
 
 ---
@@ -94,8 +115,12 @@ end
 function init_global_protection()
 	-- Catch global accesses
 	local locked_globals_mt = {
-		__index = function (t, k) log("warn", "%s", debug.traceback("Attempt to read a non-existent global '"..tostring(k).."'", 2)); end;
-		__newindex = function (t, k, v) error("Attempt to set a global: "..tostring(k).." = "..tostring(v), 2); end;
+		__index = function (t, k)
+		  log("warn", "%s", debug.traceback("Attempt to read a non-existent global '"..tostring(k).."'", 2))
+		end,
+		__newindex = function (t, k, v)
+		  error("Attempt to set a global: "..tostring(k).." = "..tostring(v), 2)
+		end
 	};
 		
 	function croxy.unlock_globals()
