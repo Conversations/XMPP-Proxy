@@ -330,7 +330,7 @@ function streamclosed(session)
   session:close()
 end
 
-local function eventname_from_stanza(stanza)
+function eventname_from_stanza(stanza)
   if stanza.attr.xmlns == nil then
     if stanza.name == "iq" and (stanza.attr.type == "set" or stanza.attr.type == "get") then
       event = "/iq/"..stanza.tags[1].attr.xmlns..":"..stanza.tags[1].name;
@@ -340,7 +340,7 @@ local function eventname_from_stanza(stanza)
   else
     event = "/"..stanza.attr.xmlns..":"..stanza.name;
   end
-  print ('eventname:', event)
+
   return event
 end
 

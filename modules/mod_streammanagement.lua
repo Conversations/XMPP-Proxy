@@ -1,5 +1,8 @@
 local croxy = _G.croxy
 local st = require "util.stanza"
+local datetime = require "util.datetime".datetime
+local eventname_from_stanza = require "core.sessionmanager".eventname_from_stanza
+local os_time = os.time
 local math_min = math.min
 
 local sm_xmlns = 'urn:xmpp:sm:3';
@@ -128,14 +131,43 @@ croxy.event.add_handler("incoming-stanza-prolog", function (session, stanza)
   end
 end)
 
-croxy.events.add_handler("outgoing-stanza/iq/urn:conversations:notifications:0:notification-gateway", notification_gateway, 10)
+function dispatch_offline_stanza(session, stanza)
+  local stanza = stanza
+  
+  if stanza:get_child('delay', 'urn:xmpp:delay') ~= true then
+    stanza = st.clone(stanza)
+    
+    stanza:tag('delay', { xmlns='urn:xmpp:delay', from=croxy.config['host'], stamp=datetime(os.time()) }):up()
+  end
+   
+  croxy.events.fire_event('offline-stanza'..eventname_from_stanza(stanza), session, stanza)
+  croxy.events.fire_event('offline-stanza', session, stanza)
+end
 
 croxy.events.add_handler("client-disconnected", function client_disconnected(session)
   if session.client.sm_enabled == true then
     session.client_disconnected = true
+  
+    ---
+    -- The client session will be destroyed soon, so we need to save the 
+    -- not acknownledged stanzas here, sent notifications as needed.
+    ---
+    unhandled_stanzas = session.client.queue
+        
+    for i, stanza in ipairs(unhandled_stanzas) do 
+          dispatch_offline_stanza(session, stanza)
+    end
   
     return true
   else
     return nil
   end
 end, 10)
+
+croxy.events.add_handler('incoming-stanza', function (session, stanza)
+  if session.client_disconnected == true then
+    dispatch_offline_stanza(session, stanza)
+    
+    return true
+  end
+end)

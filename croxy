@@ -33,6 +33,7 @@ function load_libraries()
 	
 	require "util.xmppstream"
 	require "util.random_string"
+	require "util.datetime"
 	require "core.sessionmanager"
 	require "net.xmppclient_listener"
 	require "net.xmppserver_listener"
