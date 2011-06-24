@@ -69,4 +69,4 @@ croxy.events.add_handler("server-connected", server_connected, 10)
 --croxy.events.add_handler("stream-features", advertize_tls, 100) -- Use high priority
 croxy.events.add_handler("incoming-stanza/http://etherx.jabber.org/streams:features", clean_stream_features)
 croxy.events.add_handler("incoming-stanza/http://etherx.jabber.org/streams:features", start_server_tls, 10)
-croxy.events.add_handler("incoming-stanza/'..xmlns_starttls..':proceed", server_proceed)
+croxy.events.add_handler("incoming-stanza/"..xmlns_starttls..":proceed", server_proceed)

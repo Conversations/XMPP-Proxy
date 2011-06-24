@@ -9,6 +9,7 @@ local logger = require "util.logger"
 local random_string = require "util.random_string"
 local st = require "util.stanza"
 local uuid_generate = require "util.uuid".generate
+local traverse = require "util.traverse"
 
 local print = print
 
@@ -99,11 +100,13 @@ function new_session(conn, type, proxy_session)
   -- Trace how many sessions we have
   ---
   
-  session.log = logger.init(logname)
+  local log = logger.init(logname)
+  
+  session.log = log
   session.trace = newproxy(true);
   getmetatable(session.trace).__gc = function ()
     open_sessions[type] = open_sessions[type] - 1
-    session.log("info", "deallocated session. Now %d open sessions of type %s exists.", open_sessions[type], type)
+    log("info", "deallocated session. Now %d open sessions of type %s exists.", open_sessions[type], type)
   end
   open_sessions[type] = open_sessions[type] + 1
   
@@ -132,7 +135,7 @@ function new_session(conn, type, proxy_session)
 end
 
 function session_mt:send(t)
-  self.log("debug", '-> '..tostring(t))
+  --self.log("debug", '-> '..tostring(t))
   self.conn:write(tostring(t))
 end
 
@@ -230,6 +233,11 @@ function destroy_session(session)
   end
   
   retire_session(session)
+  
+  --collectgarbage("collect");
+  
+  --print("ref count for "..tostring(session).." is "..tostring(traverse.countreferences(session)))
+  --traverse.findallpaths(session)
 end
 
 --[[
@@ -345,7 +353,7 @@ function eventname_from_stanza(stanza)
 end
 
 function handlestanza(session, stanza)
-  session.log("debug", '<- '..tostring(stanza))
+  --session.log("debug", '<- '..tostring(stanza))
   
   if session.type == "client" then
     local handled
@@ -382,7 +390,7 @@ function handlestanza(session, stanza)
       session.log("error", "The following incoming stanza was not handled and will be droped: %s", stanza:pretty_print())
     end
   else
-    session.log("error", "Reviced stanza but session of type %s don't recive stanzas. Following stanza is droped: %s", session.type, stanza:pretty_print())
+    session.log("error", "Reviced stanza but session of type %s dont recive stanzas. Following stanza is droped: %s", session.type, stanza:pretty_print())
   end
 end
 

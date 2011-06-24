@@ -2,6 +2,7 @@ local croxy = _G.croxy
 local st = require "util.stanza"
 local datetime = require "util.datetime".datetime
 local eventname_from_stanza = require "core.sessionmanager".eventname_from_stanza
+local datamanager = require "util.datamanager"
 local os_time = os.time
 local math_min = math.min
 
@@ -81,11 +82,11 @@ function handle_ack_request(session, stanza)
   return true
 end
 
-croxy.event.add_handler("outgoing-stanza/"..sm_xmlns..":r", function (session, stanza)
+croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":r", function (session, stanza)
   return handle_ack_request(session.client, stanza)
 end)
 
-croxy.event.add_handler("incoming-stanza/"..sm_xmlns..":r", function (session, stanza)
+croxy.events.add_handler("incoming-stanza/"..sm_xmlns..":r", function (session, stanza)
   return handle_ack_request(session.server, stanza)
 end)
 
@@ -111,21 +112,21 @@ function handle_ack(session, stanza)
   return true
 end
 
-croxy.event.add_handler("outgoing-stanza/"..sm_xmlns..":a", function (session, stanza)
+croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":a", function (session, stanza)
   return handle_ack(session.client, stanza)
 end)
 
-croxy.event.add_handler("incoming-stanza/"..sm_xmlns..":a", function (session, stanza)
+croxy.events.add_handler("incoming-stanza/"..sm_xmlns..":a", function (session, stanza)
   return handle_ack(session.server, stanza)
 end)
 
-croxy.event.add_handler("outgoing-stanza-prolog", function (session, stanza)
+croxy.events.add_handler("outgoing-stanza-prolog", function (session, stanza)
   if session.client.sm_enabled == true then
     session.client.handled_stanza_count = session.client.handled_stanza_count + 1
   end
 end)
 
-croxy.event.add_handler("incoming-stanza-prolog", function (session, stanza)
+croxy.events.add_handler("incoming-stanza-prolog", function (session, stanza)
   if session.server.sm_enabled == true then
     session.server.handled_stanza_count = session.server.handled_stanza_count + 1
   end
@@ -133,6 +134,7 @@ end)
 
 function dispatch_offline_stanza(session, stanza)
   local stanza = stanza
+  local handled
   
   if stanza:get_child('delay', 'urn:xmpp:delay') ~= true then
     stanza = st.clone(stanza)
@@ -140,19 +142,22 @@ function dispatch_offline_stanza(session, stanza)
     stanza:tag('delay', { xmlns='urn:xmpp:delay', from=croxy.config['host'], stamp=datetime(os.time()) }):up()
   end
    
-  croxy.events.fire_event('offline-stanza'..eventname_from_stanza(stanza), session, stanza)
-  croxy.events.fire_event('offline-stanza', session, stanza)
+  handled = croxy.events.fire_event('offline-stanza'..eventname_from_stanza(stanza), session, stanza)
+  
+  if not handled then
+    handled = croxy.events.fire_event('offline-stanza', session, stanza)
+  end
 end
 
-croxy.events.add_handler("client-disconnected", function client_disconnected(session)
-  if session.client.sm_enabled == true then
+croxy.events.add_handler("client-disconnected", function (session)
+  if session.client.sm_enabled == true or true then
     session.client_disconnected = true
   
     ---
     -- The client session will be destroyed soon, so we need to save the 
     -- not acknownledged stanzas here, sent notifications as needed.
     ---
-    unhandled_stanzas = session.client.queue
+    local unhandled_stanzas = session.client.queue or {}
         
     for i, stanza in ipairs(unhandled_stanzas) do 
           dispatch_offline_stanza(session, stanza)
@@ -170,4 +175,9 @@ croxy.events.add_handler('incoming-stanza', function (session, stanza)
     
     return true
   end
+end)
+
+-- To store offline stanzas
+croxy.events.add_handler('offline-stanza', function (session, stanza)
+  return datamanager.list_append(session.secret, croxy.config['host'], 'offline-stanzas', st.preserialize(stanza))
 end)

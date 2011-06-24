@@ -8,6 +8,7 @@ local log
 local events
 local server
 local socket
+local datamanager
 
 --- local config = {}; local f = loadfile("config.rc"); setfenv(f, config); f()
 
@@ -30,10 +31,14 @@ function load_libraries()
     luasec = require "ssl"
 	socket = require "socket"
 	server = require "net.server"
+	datamanager = require "util.datamanager"
 	
 	require "util.xmppstream"
 	require "util.random_string"
 	require "util.datetime"
+	require "util.serialization"
+	require "util.jid"
+	require "util.traverse"
 	require "core.sessionmanager"
 	require "net.xmppclient_listener"
 	require "net.xmppserver_listener"
@@ -82,6 +87,8 @@ function load_config()
     setfenv(c, croxy.config)
     c()
   end
+  
+  datamanager.set_data_path('./data')
   
   ---
   -- Make the config imutable and

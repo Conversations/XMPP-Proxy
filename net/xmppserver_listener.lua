@@ -77,9 +77,7 @@ end
 
 function xmppserver.onincoming(conn, data)
   local session = conn.session
-  
-  print("raw incoming server: "..tostring(data))
-  
+    
   if session then
     local ok, err = session.stream:feed(data)
     

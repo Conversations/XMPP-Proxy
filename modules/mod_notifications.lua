@@ -1,8 +1,9 @@
 
 local croxy = _G.croxy
 local st = require "util.stanza"
+local jid_bare = require "util.jid".bare
 
-function notification_gateway(session, stanza)
+croxy.events.add_handler('outgoing-stanza/iq/urn:conversations:notifications:0:notification-gateway', function (session, stanza)
 ---
 -- <iq from='client@example.org' type='set'>
 --   <notification-gateway xmlns='urn:conversations:notifications'>
@@ -41,7 +42,7 @@ function notification_gateway(session, stanza)
     end
     
     session.client:send(st.reply(stanza))
-end
+end)
 
 function handle_detached_message(session, stanza)
   if session.client_disconnected ~= true then
@@ -70,7 +71,7 @@ function handle_detached_message(session, stanza)
     end
     
     if session.notification_gateway.sendFrom then
-      notify_stanza:tag('from'):text(stanza.attr["from"]):up()
+      notify_stanza:tag('from'):text(jid_bare(stanza.attr["from"])):up()
     end
     
     notify_stanza:up()
@@ -78,8 +79,6 @@ function handle_detached_message(session, stanza)
     -- Not nice but working for now
     session.server:send(notify_stanza)
   end
-  
-  return true
 end
 
 croxy.events.add_handler("incoming-stanza/message", handle_detached_message)

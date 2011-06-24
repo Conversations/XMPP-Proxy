@@ -40,8 +40,6 @@ function session_close(self, reason)
   -- Call handler
   self.conn:close()
   xmppclient.ondisconnect(self.conn)
-  
-  sessionmanager.destroy_session(self)
 end
 
 function stream_callbacks.error(session, error, data)
@@ -85,6 +83,8 @@ function xmppclient.ondisconnect(conn, err)
   
   croxy.events.fire_event("client-disconnected", session.proxy)  
   session.log("info", "Client disconnected")
+  
+  sessionmanager.destroy_session(session)
 end
 
 return xmppclient
