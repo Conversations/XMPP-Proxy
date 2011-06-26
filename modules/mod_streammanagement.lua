@@ -5,20 +5,20 @@ local eventname_from_stanza = require "core.sessionmanager".eventname_from_stanz
 local datamanager = require "util.datamanager"
 local os_time = os.time
 local math_min = math.min
+local t_remove = table.remove
+local pairs, tonumber = paris, tonumber
 
 local sm_xmlns = 'urn:xmpp:sm:3';
 local sm_attrs = { xmlns = sm_xmlns };
 local sm_feature = st.stanza("sm", sm_attrs);
 
-function session_created(session)
+croxy.events.add_handler("session-created", function (session)
   if session.type ~= 'client' then
     return
   end
 
   session.resumption_enabled = false
-end
-
-croxy.events.add_handler("session-created", session_created, 10)
+end, 10)
 
 croxy.events.add_handler("stream-features", function (session, features)
   features:add_child(sm_feature)
@@ -44,7 +44,7 @@ function enable_sm(session)
       org_send(self, t)
      
       if t.type == 'stanza' and (t.attr.xmlns == nil or t.attr.xmlns == "jabber:client") then
-        session.queue[#queue + 1] = st.clone(t)
+        session.queue[#session.queue + 1] = st.clone(t)
         
         if session.awaiting_ack ~= true then
           session.awaiting_ack = true
@@ -70,7 +70,7 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":enabled", function (ses
   return true
 end)
 
-function handle_ack_request(session, stanza)
+local function handle_ack_request(session, stanza)
   if session.sm_enabled ~= true then
      session.log('warn', 'Entity requested ack on non sm enabled session')
      
@@ -90,7 +90,7 @@ croxy.events.add_handler("incoming-stanza/"..sm_xmlns..":r", function (session, 
   return handle_ack_request(session.server, stanza)
 end)
 
-function handle_ack(session, stanza)
+local function handle_ack(session, stanza)
   if session.sm_enabled ~= true then
      session.log('warn', 'Entity requested ack on non sm enabled session')
      
@@ -100,7 +100,7 @@ function handle_ack(session, stanza)
   local handled_stanza_count = tonumber(stanza.attr.h) - session.last_acknowledged_stanza
   
   if handled_stanza_count > #session.queue then
-    session.log('warn', 'Entity acked %d stanzas but only sent %d', handle_stanza_count, #session.queue)
+    session.log('warn', 'Entity acked %d stanzas but only sent %d', handled_stanza_count, #session.queue)
   end
   
   for i=1,math_min(handled_stanza_count, #session.queue) do
@@ -132,7 +132,7 @@ croxy.events.add_handler("incoming-stanza-prolog", function (session, stanza)
   end
 end)
 
-function dispatch_offline_stanza(session, stanza)
+local function dispatch_offline_stanza(session, stanza)
   local stanza = stanza
   local handled
   
