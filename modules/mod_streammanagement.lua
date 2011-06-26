@@ -163,6 +163,11 @@ croxy.events.add_handler("client-disconnected", function (session)
           dispatch_offline_stanza(session, stanza)
     end
   
+    datamanager.store(session.secret, croxy.config['host'], 'stream-management', {
+      handled_stanza_count = session.client.handled_stanza_count,
+      last_acknowledged_stanza = session.client.last_acknowledged_stanza
+    })
+  
     return true
   else
     return nil
