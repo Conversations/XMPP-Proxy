@@ -43,13 +43,13 @@ end
 
 local function xmpp_proxy (session, stanza)
 
-  -- This stanza is not adressed to us, so leave it alone
+  -- This stanza is not addressed to us, so leave it alone
   if stanza.attr.to ~= croxy.config['host'] then
     return nil
   end
   
   local xmpp_proxy_element = stanza.tags[1]
-  local action_element = nil
+  local action_element
   
   action_element = xmpp_proxy_element:get_child("connect")
   
@@ -87,17 +87,19 @@ function create_outgoing_connection(proxy_session, host, port)
   return conn
 end
 
-function server_connected(session)
-  local iq = st.iq({ type="set", to=session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag("connected"):up():up():up()
+croxy.events.add_handler("server-connected", function (proxy_session)
+  local iq = st.iq({ type="set", to= proxy_session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag("connected"):up():up():up()
     
-  session.server.notopen = true
-  session.server.stream:reset()
-  session.server.connected = true
-  session.client:send(iq)
-  session.client.notopen = true
-  session.client.stream:reset()
-  session.client.allows_stream_restarts = true
-end
+  proxy_session.server.notopen = true
+  proxy_session.server.stream:reset()
+  proxy_session.server.connected = true
+  proxy_session.client:send(iq)
+  proxy_session.client.notopen = true
+  proxy_session.client.stream:reset()
+  proxy_session.client.allows_stream_restarts = true
+
+  return true
+end)
 
 function server_stream_error(session, error)
   ---
@@ -114,11 +116,15 @@ function server_stream_error(session, error)
   session.client:close()
 end
 
-function client_disconnected(session)
+---
+-- If nobody prevents us, we close the connection to the server
+-- when the client disconnects
+---
+croxy.events.add_handler("client-disconnected", function (session)
   session.server:close()
-end
+end)
 
-function bind(session, stanza)
+croxy.events.add_handler("incoming-stanza/iq", function (session, stanza)
   if #stanza.tags == 0 then
     return
   end
@@ -131,12 +137,9 @@ function bind(session, stanza)
 
   session.from = bindElement:get_child_text('jid')
   
-  session.log('debug', 'got from %s', tostring(session.from))
-end
+  session.log('debug', 'Client bound its resource. The full JID of this proxy is now %s', session.from)
+end, 10)
 
-croxy.events.add_handler("client-disconnected", client_disconnected, 0)
 croxy.events.add_handler("server-stream-error", server_stream_error, 0)
 croxy.events.add_handler("stream-features", advertize_xmpp_proxy, 0)
-croxy.events.add_handler("server-connected", server_connected, 0)
 croxy.events.add_handler("outgoing-stanza/iq/urn:conversations:xmpp-proxy:xmpp-proxy", xmpp_proxy, 10)
-croxy.events.add_handler("incoming-stanza/iq", bind, 10)

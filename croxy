@@ -75,8 +75,7 @@ function load_config()
   defaults["port"] = 5000
   defaults["host"] = "xmpp-proxy.conversations.im" -- The name of this croxy. Is used as JID to address it.
   defaults["require-client-encryption"] = true -- Only accept connections encrypted via tls
-  
-  
+
   ---
   -- Load config
   ---
