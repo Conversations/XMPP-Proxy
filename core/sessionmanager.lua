@@ -59,7 +59,7 @@ session_mt = {}
 session_mt.__index = session_mt
 
 function new_session(conn, type, proxy_session)
-  local session = nil
+  local session
   
   session = (sessions[type] or {})[conn]
   

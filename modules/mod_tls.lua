@@ -16,7 +16,7 @@ croxy.events.add_handler("stream-features", function (session, features)
 
   features:add_child(tls_feature);
   
-  -- If we require tls only advertize it
+  -- If we require tls only advertise it
   if croxy.config['require-client-encryption'] then
     return true
   end

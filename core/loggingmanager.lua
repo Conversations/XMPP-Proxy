@@ -32,7 +32,7 @@ function log_sink(source_name, level, message, ...)
   local style_warning = getstyle("yellow", "bold")
   local style_error = getstyle("red", "bold")
   
-  local level_string = nil
+  local level_string
   
   if level == "debug" then level_string = getstring(style_verbose, "D")
   elseif level == "info" then level_string = getstring(style_informal, "I")
