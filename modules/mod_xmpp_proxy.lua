@@ -10,38 +10,49 @@ local xmlns_xmpp_proxy = 'urn:conversations:xmpp-proxy';
 local xmpp_proxy_attr = { xmlns = xmlns_xmpp_proxy };
 local xmpp_proxy_feature = st.stanza("xmpp-proxy", xmpp_proxy_attr);
 
-local function advertize_xmpp_proxy (session, features)
-  features:add_child(xmpp_proxy_feature);
-end
-
-function handle_connect_stanza(session, stanza)
+local function handle_connect_stanza(proxy_session, stanza)
   local connect_element = stanza.tags[1]:get_child("connect")
   
   local to = connect_element.attr["to"]
   local host = connect_element.attr["host"]
   local port = tonumber(connect_element.attr["port"])
+  -- todo figure out starttls here and check it's xmlns
   
-  if to == nil or host == nil or port == nil then
-    session.client:send(st.error_reply(stanza, "modify", "bad-request"));
+  if not (to ~= nil and host ~= nil and port ~= nil and port > 0 and port < 65536) then
+    proxy_session.client:send(st.error_reply(stanza, "modify", "bad-request"))
     return
   end
+
+  -- The stanza seems to be valid, reply the client that it was ok
+  proxy_session.client:send(st.reply(stanza))
+
+  proxy_session.log("debug", "client asks to connect to "..tostring(to).." using host "..tostring(host).." on port "..tostring(port))
   
-  session.log("debug", "client asks to connect to "..tostring(to).." using host "..tostring(host).." on port "..tostring(port))
-  
-  local conn = create_outgoing_connection(session, host, port)
-  local server = sessionmanager.new_session(conn, "server", session)
+  local conn,err = create_outgoing_connection(proxy_session, host, port)
+
+  if conn == nil then
+    local iq
+
+    iq = st.iq({ type="set", to= proxy_session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr)
+
+    iq:tag("status"):tag("error"):text(tostring(err)):up():up():up():up()
+
+    proxy_session.client:send(iq)
+
+    return
+  end
+
+  local server = sessionmanager.new_session(conn, "server", proxy_session)
   conn.session = server
   
-  session.server.to = to
+  proxy_session.server.to = to
   
   if connect_element:get_child("starttls") ~= nil then
-      session.server.should_starttls = true
+      proxy_session.server.should_starttls = true
   end
-  
-  session.client:send(st.reply(stanza))
 end
 
-local function xmpp_proxy (session, stanza)
+croxy.events.add_handler("outgoing-stanza/iq/"..xmlns_xmpp_proxy..":xmpp-proxy", function (proxy_session, stanza)
 
   -- This stanza is not addressed to us, so leave it alone
   if stanza.attr.to ~= croxy.config['host'] then
@@ -54,37 +65,38 @@ local function xmpp_proxy (session, stanza)
   action_element = xmpp_proxy_element:get_child("connect")
   
   if action_element ~= nil then
-    handle_connect_stanza(session, stanza)
+    handle_connect_stanza(proxy_session, stanza)
     
     return true
+  else
+    -- Don't know that action
+    proxy_session.client:send(st.error_reply(stanza, "modify", "bad-request"))
   end
-  
-  session.log("debug", "got xmpp-proxy stanza"..tostring(element))
-  
-  return true
-end
 
-function create_outgoing_connection(proxy_session, host, port)
+  return true
+end, 10)
+
+local function create_outgoing_connection(proxy_session, host, port)
 
   local conn, handler = socket.tcp();
 	
   if not conn then
     proxy_session.log("error", "Could not create tcp socket")
-    return false
+    return nil, nil
   end
 
   conn:settimeout(0);
   local success, err = conn:connect(host, port);
   if not success and err ~= "timeout" then
     proxy_session.log("error", "could not connect to %s:%d: %s", host, port, err)
-	return false, err;
+	return nil, err;
   end
 
   proxy_session.log("debug", "created outgoing connection")
   
   conn = wrapclient(conn, host, port, xmppserver_listener, "*a");
   
-  return conn
+  return conn, nil
 end
 
 croxy.events.add_handler("server-connected", function (proxy_session)
@@ -101,7 +113,7 @@ croxy.events.add_handler("server-connected", function (proxy_session)
   return true
 end)
 
-function server_stream_error(session, error)
+croxy.events.add_handler("server-stream-error", function (proxy_session, error)
   ---
   --  The server stream failed, fail the client stream too...
   ---
@@ -112,19 +124,19 @@ function server_stream_error(session, error)
     stanza:add_child(child):up()
   end
   
-  session.client:send(stanza)
-  session.client:close()
-end
+  proxy_session.client:send(stanza)
+  proxy_session.client:close()
+end)
 
 ---
 -- If nobody prevents us, we close the connection to the server
 -- when the client disconnects
 ---
-croxy.events.add_handler("client-disconnected", function (session)
-  session.server:close()
+croxy.events.add_handler("client-disconnected", function (proxy_session)
+  proxy_session.server:close()
 end)
 
-croxy.events.add_handler("incoming-stanza/iq", function (session, stanza)
+croxy.events.add_handler("incoming-stanza/iq", function (proxy_session, stanza)
   if #stanza.tags == 0 then
     return
   end
@@ -135,11 +147,11 @@ croxy.events.add_handler("incoming-stanza/iq", function (session, stanza)
     return
   end
 
-  session.from = bindElement:get_child_text('jid')
+  proxy_session.from = bindElement:get_child_text('jid')
   
-  session.log('debug', 'Client bound its resource. The full JID of this proxy is now %s', session.from)
+  proxy_session.log('debug', 'Client bound its resource. The full JID of this proxy is now %s', proxy_session.from)
 end, 10)
 
-croxy.events.add_handler("server-stream-error", server_stream_error, 0)
-croxy.events.add_handler("stream-features", advertize_xmpp_proxy, 0)
-croxy.events.add_handler("outgoing-stanza/iq/urn:conversations:xmpp-proxy:xmpp-proxy", xmpp_proxy, 10)
+croxy.events.add_handler("stream-features", function (session, features)
+  features:add_child(xmpp_proxy_feature);
+end)

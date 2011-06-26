@@ -21,7 +21,7 @@ local sessions = {
 	server = {}
 }
 
-local open_sessions = {
+local allocated_sessions_count = {
 	client = 0,
 	proxy = 0,
 	server = 0
@@ -99,18 +99,24 @@ function new_session(conn, type, proxy_session)
   ---
   -- Trace how many sessions we have
   ---
+
+  session.log = logger.init(logname)
+
+  if true then
+    -- For debugging how many sessions are allocated
+    local log = session.log
+
+    session.trace = newproxy(true);
+    getmetatable(session.trace).__gc = function ()
+      allocated_sessions_count[type] = allocated_sessions_count[type] - 1
+      log("debug", "Deallocated session. Now %d allocated and %d open sessions of type %s exists.",
+        allocated_sessions_count[type], #sessions[type], type)
+    end
+    allocated_sessions_count[type] = allocated_sessions_count[type] + 1
   
-  local log = logger.init(logname)
-  
-  session.log = log
-  session.trace = newproxy(true);
-  getmetatable(session.trace).__gc = function ()
-    open_sessions[type] = open_sessions[type] - 1
-    log("info", "deallocated session. Now %d open sessions of type %s exists.", open_sessions[type], type)
+    log("debug", "Now %d allocated and %d open sessions of type %s exists",
+      allocated_sessions_count[type], #sessions[type], type)
   end
-  open_sessions[type] = open_sessions[type] + 1
-  
-  croxy.log("debug", "Now %d sessions of type %s exists", open_sessions[type], type)
   
   ---
   -- If the caller didn't pass an proxy_session
@@ -171,7 +177,7 @@ function new_proxy_session()
   -- Insert the session in our session table.
   -- the secret is the proxy for easy refinding later
   ---
-  
+
   sessions["proxy"][session.secret] = session
     
   return session
@@ -233,11 +239,6 @@ function destroy_session(session)
   end
   
   retire_session(session)
-  
-  --collectgarbage("collect");
-  
-  --print("ref count for "..tostring(session).." is "..tostring(traverse.countreferences(session)))
-  --traverse.findallpaths(session)
 end
 
 --[[
@@ -394,24 +395,24 @@ function handlestanza(session, stanza)
   end
 end
 
-function outgoing_stanza_route(session, stanza)
-  if not session.server or not session.server.connected then
-    session.log("error", "not connected")
+function outgoing_stanza_route(proxy_session, stanza)
+  if not proxy_session.server or not proxy_session.server.connected then
+    proxy_session.log("error", "not connected")
     return
   end
   
-  session.server:send(stanza)
+  proxy_session.server:send(stanza)
   
   return true
 end
 
-function incoming_stanza_route(session, stanza)
-  if not session.server or not session.server.connected then
-    session.log("error", "not connected")
+function incoming_stanza_route(proxy_session, stanza)
+  if not proxy_session.server or not proxy_session.server.connected then
+    proxy_session.log("error", "not connected")
     return
   end
   
-  session.client:send(stanza)
+  proxy_session.client:send(stanza)
   
   return true
 end

@@ -12,18 +12,22 @@ if croxy.config['require-client-encryption'] then
 end
 
 croxy.events.add_handler("stream-features", function (session, features)
-  features:add_child(tls_feature);
+  -- Only add the tls feature if not already secured
+  if session.secure ~= true then
+    features:add_child(tls_feature);
 
-  -- If we require tls only advertise it
-  if croxy.config['require-client-encryption'] then
-    return true
+    -- If we require tls only advertise it
+    if croxy.config['require-client-encryption'] then
+      return true
+    end
+
   end
 end, 100)
 
-croxy.events.add_handler("outgoing-stanza/"..xmlns_starttls..":starttls", function (session, features)
-  if session.client.secure ~= true then
-    session.client:send(st.stanza("proceed", starttls_attr))
-    session.client.conn:starttls({
+croxy.events.add_handler("outgoing-stanza/"..xmlns_starttls..":starttls", function (proxy_session, features)
+  if proxy_session.client.secure ~= true then
+    proxy_session.client:send(st.stanza("proceed", starttls_attr))
+    proxy_session.client.conn:starttls({
       mode = "server",
       protocol = "tlsv1",
       verify = "none",
@@ -31,7 +35,11 @@ croxy.events.add_handler("outgoing-stanza/"..xmlns_starttls..":starttls", functi
       key = croxy.config['key'],
       certificate = croxy.config['cert']
     })
-    session.client.secure = false
+    proxy_session.client.secure = false
+
+    -- Reset the stream
+    proxy_session.client.notopen = true
+    proxy_session.client.stream:reset()
     
     return true
   end
