@@ -112,40 +112,49 @@ local function handle_ack(session, stanza)
   return true
 end
 
-croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":a", function (session, stanza)
-  return handle_ack(session.client, stanza)
+croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":a", function (proxy_session, stanza)
+  return handle_ack(proxy_session.client, stanza)
 end)
 
-croxy.events.add_handler("incoming-stanza/"..sm_xmlns..":a", function (session, stanza)
-  return handle_ack(session.server, stanza)
+croxy.events.add_handler("incoming-stanza/"..sm_xmlns..":a", function (proxy_session, stanza)
+  return handle_ack(proxy_session.server, stanza)
 end)
 
-croxy.events.add_handler("outgoing-stanza-prolog", function (session, stanza)
-  if session.client.sm_enabled == true then
-    session.client.handled_stanza_count = session.client.handled_stanza_count + 1
+croxy.events.add_handler("outgoing-stanza-prolog", function (proxy_session, stanza)
+  if proxy_session.client.sm_enabled == true then
+    proxy_session.client.handled_stanza_count = proxy_session.client.handled_stanza_count + 1
   end
 end)
 
-croxy.events.add_handler("incoming-stanza-prolog", function (session, stanza)
-  if session.server.sm_enabled == true then
-    session.server.handled_stanza_count = session.server.handled_stanza_count + 1
+croxy.events.add_handler("incoming-stanza-prolog", function (proxy_session, stanza)
+  if proxy_session.server.sm_enabled == true then
+    proxy_session.server.handled_stanza_count = proxy_session.server.handled_stanza_count + 1
   end
 end)
 
-local function dispatch_offline_stanza(session, stanza)
+local function dispatch_offline_stanza(proxy_session, stanza)
   local stanza = stanza
   local handled
   
   if stanza:get_child('delay', 'urn:xmpp:delay') ~= true then
     stanza = st.clone(stanza)
     
-    stanza:tag('delay', { xmlns='urn:xmpp:delay', from=croxy.config['host'], stamp=datetime(os.time()) }):up()
+    stanza:tag('delay', {
+      xmlns='urn:xmpp:delay',
+      from=croxy.config['host'],
+      stamp=datetime(os.time())
+    }):up()
   end
    
-  handled = croxy.events.fire_event('offline-stanza'..eventname_from_stanza(stanza), session, stanza)
+  handled = croxy.events.fire_event('offline-stanza'..eventname_from_stanza(stanza), proxy_session, stanza)
   
   if not handled then
-    handled = croxy.events.fire_event('offline-stanza', session, stanza)
+    handled = croxy.events.fire_event('offline-stanza', proxy_session, stanza)
+  end
+
+  if not handled then
+    -- this should not happened, as they should be saved by the default handler
+    proxy_session.log("warn", "Offline stanza was not handled and will be droped: %s", stanza:pretty_print())
   end
 end
 
@@ -169,8 +178,6 @@ croxy.events.add_handler("client-disconnected", function (session)
     })
   
     return true
-  else
-    return nil
   end
 end, 10)
 
