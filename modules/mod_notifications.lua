@@ -3,7 +3,9 @@ local croxy = _G.croxy
 local st = require "util.stanza"
 local jid_bare = require "util.jid".bare
 
-croxy.events.add_handler('outgoing-stanza/iq/urn:conversations:notifications:0:notification-gateway', function (session, stanza)
+local notifications_xmlns = "urn:conversations:notifications:0"
+
+croxy.events.add_handler('outgoing-stanza/iq/'..notifications_xmlns..':notification-gateway', function (session, stanza)
 ---
 -- <iq from='client@example.org' type='set'>
 --   <notification-gateway xmlns='urn:conversations:notifications'>
@@ -44,7 +46,7 @@ croxy.events.add_handler('outgoing-stanza/iq/urn:conversations:notifications:0:n
     session.client:send(st.reply(stanza))
 end)
 
-function handle_detached_message(session, stanza)
+croxy.events.add_handler("incoming-stanza/message", function (session, stanza)
   if session.client_disconnected ~= true then
     return
   end
@@ -64,7 +66,7 @@ function handle_detached_message(session, stanza)
   
     local notify_stanza = st.message({to=session.notification_gateway.gateway, from=session.from})
     
-    notify_stanza:tag('notify', {['user-identifier']=session.notification_gateway.user_identifier, xmlns='urn:conversations:notifications:0'})
+    notify_stanza:tag('notify', {['user-identifier']=session.notification_gateway.user_identifier, xmlns=notifications_xmlns})
     
     if session.notification_gateway.sendBody then
       notify_stanza:tag('body'):text(body:get_text()):up()
@@ -79,6 +81,4 @@ function handle_detached_message(session, stanza)
     -- Not nice but working for now
     session.server:send(notify_stanza)
   end
-end
-
-croxy.events.add_handler("incoming-stanza/message", handle_detached_message)
+end)
