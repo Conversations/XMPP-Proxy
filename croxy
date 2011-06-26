@@ -10,8 +10,6 @@ local server
 local socket
 local datamanager
 
---- local config = {}; local f = loadfile("config.rc"); setfenv(f, config); f()
-
 --
 -- Loading functions for setup
 --
