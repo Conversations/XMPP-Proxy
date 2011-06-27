@@ -2,6 +2,8 @@ local croxy = _G.croxy
 local st = require "util.stanza"
 local datetime = require "util.datetime".datetime
 local eventname_from_stanza = require "core.sessionmanager".eventname_from_stanza
+local proxy_sessions = require "core.sessionmanager".sessions["proxy"]
+local destroy_session = require "core.sessionmanager".destroy_session
 local datamanager = require "util.datamanager"
 local os_time = os.time
 local math_min = math.min
@@ -193,3 +195,95 @@ end)
 croxy.events.add_handler('offline-stanza', function (session, stanza)
   return datamanager.list_append(session.secret, croxy.config['host'], 'offline-stanzas', st.preserialize(stanza))
 end)
+
+
+croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (source_proxy_session, stanza)
+  if source_proxy_session.server and source_proxy_session.server.connected == true then
+    -- When the client is connected to an server, resumption is not longer possible
+
+    source_proxy_session.client:send(st.stanza("failed", sm_attrs):tag("unexpected-request", {xmlns = "urn:ietf:params:xml:ns:xmpp-stanzas"}))
+
+    return
+  end
+
+  local proxy_session_id = stanza.attr['previd']
+  local proxy_session = proxy_session_id ~= nil and proxy_sessions[proxy_session_id] or nil
+
+  if proxy_session == nil then
+    -- The proxy session could not be found and therefore cannot be resumed
+
+    source_proxy_session.client:send(st.stanza("failed", sm_attrs):tag("item-not-found", {xmlns = "urn:ietf:params:xml:ns:xmpp-stanzas"}))
+
+    return
+  end
+
+  if proxy_session.client_disconected ~= true then
+    -- todo disconnect the old client
+  end
+
+  local sm_info = datamanager.load(proxy_session.secret, croxy.config['host'], 'stream-management')
+
+  if sm_info == nil then
+    source_proxy_session:send(st.stanza("failed", sm_attrs):tag("internal-server-error", {xmlns = "urn:ietf:params:xml:ns:xmpp-stanzas"}))
+
+    proxy_session.server:disconnect()
+    destroy_session(proxy_session)
+
+    return
+  end
+
+  -- Reconnect the client to the resumed proxy_session
+  local client = source_proxy_session.client
+
+  source_proxy_session:set_client(nil)
+  destroy_session(source_proxy_session)
+
+  proxy_session:set_server(client)
+  proxy_session.client_disconnected = nil
+
+  enable_sm(proxy_session.client)
+  -- Restore old sm parameters
+  proxy_session.client.handled_stanza_count = sm_info.handled_stanza_count
+  proxy_session.client.last_acknowledged_stanza = sm_info.last_acknowledged_stanza
+
+  local offline_stanzas = datamanager.list_load(session.secret, croxy.config['host'], 'offline-stanzas')
+
+  if stanza.attr['h'] ~= nil then
+    local h = stanza.attr['h']
+
+    if h > proxy_session.client.last_acknowledged_stanza then
+      -- The client has handled more stanzas than he was able to ack last time
+      -- ack them now.
+      local handled_stanza_count = tonumber(h) - proxy_session.client.last_acknowledged_stanza
+
+      if handled_stanza_count > #offline_stanzas then
+        proxy_session.log('warn', 'Entity acked %d stanzas but only sent %d', handled_stanza_count, #offline_stanzas)
+      end
+
+      for i=1,math_min(handled_stanza_count, #offline_stanzas) do
+  	    t_remove(offline_stanzas, 1)
+      end
+
+      proxy_session.client.last_acknowledged_stanza = proxy_session.client.last_acknowledged_stanza + handled_stanza_count;
+    elseif h < proxy_session.client.last_acknowledged_stanza then
+      -- The client handled less stanzas than acknowledged... ignore this kind of error
+      proxy_session.log("debug", "Client already acked %d handled stanzas but now claims to only have handled %d.",
+        proxy_session.client.last_acknowledged_stanza, h)
+    end
+  end
+
+  -- Stream has been resumed, tell the client that
+  proxy_session.client:send(st.stanza("resumed", { xmlns = sm_xmlns, h = proxy_session.client.handled_stanza_count, previd=proxy_session.secret}))
+
+  -- Now send all stored stanzas
+  proxy_session.log("info", "Client resumed. Send %d offline stanzas.", #offline_stanzas)
+
+  for _, stanza in ipars(offline_stanzas) do
+    stanza = stanza.deserialize(stanza)
+
+    proxy_session.client:send(stanza)
+  end
+
+  croxy.events.fire_event("client-resumed", proxy_session)
+  -- Done =)
+end, 10)
