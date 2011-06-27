@@ -15,7 +15,7 @@ local print = print
 
 module "sessionmanager"
 
-local sessions = { 
+sessions = {
 	client = {},
 	proxy = {},
 	server = {}
@@ -340,6 +340,8 @@ function streamclosed(session)
 end
 
 function eventname_from_stanza(stanza)
+  local event
+
   if stanza.attr.xmlns == nil then
     if stanza.name == "iq" and (stanza.attr.type == "set" or stanza.attr.type == "get") then
       event = "/iq/"..stanza.tags[1].attr.xmlns..":"..stanza.tags[1].name;
@@ -374,7 +376,7 @@ function handlestanza(session, stanza)
     end
   elseif session.type == "server" then
     local handled
-    
+
     handled = croxy.events.fire_event('incoming-stanza-prolog', session.proxy, stanza)
   
     if not handled then

@@ -46,11 +46,7 @@ croxy.events.add_handler('outgoing-stanza/iq/'..notifications_xmlns..':notificat
     session.client:send(st.reply(stanza))
 end)
 
-croxy.events.add_handler("incoming-stanza/message", function (session, stanza)
-  if session.client_disconnected ~= true then
-    return
-  end
-  
+croxy.events.add_handler("offline-stanza/message", function (session, stanza)
   local body = stanza:get_child('body')
   
   if body ~= nil then
@@ -81,4 +77,4 @@ croxy.events.add_handler("incoming-stanza/message", function (session, stanza)
     -- Not nice but working for now
     session.server:send(notify_stanza)
   end
-end)
+end, 10)

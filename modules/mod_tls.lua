@@ -13,7 +13,7 @@ end
 
 croxy.events.add_handler("stream-features", function (session, features)
   -- Only add the tls feature if not already secured
-  if session.secure ~= true then
+  if session.secure ~= true and false then
     features:add_child(tls_feature);
 
     -- If we require tls only advertise it

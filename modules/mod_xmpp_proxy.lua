@@ -10,6 +10,29 @@ local xmlns_xmpp_proxy = 'urn:conversations:xmpp-proxy';
 local xmpp_proxy_attr = { xmlns = xmlns_xmpp_proxy };
 local xmpp_proxy_feature = st.stanza("xmpp-proxy", xmpp_proxy_attr);
 
+local function create_outgoing_connection(proxy_session, host, port)
+
+  local conn, handler = socket.tcp();
+
+  if not conn then
+    proxy_session.log("error", "Could not create tcp socket")
+    return nil, nil
+  end
+
+  conn:settimeout(0);
+  local success, err = conn:connect(host, port);
+  if not success and err ~= "timeout" then
+    proxy_session.log("error", "could not connect to %s:%d: %s", host, port, err)
+	return nil, err;
+  end
+
+  proxy_session.log("debug", "created outgoing connection")
+
+  conn = wrapclient(conn, host, port, xmppserver_listener, "*a");
+
+  return conn, nil
+end
+
 local function handle_connect_stanza(proxy_session, stanza)
   local connect_element = stanza.tags[1]:get_child("connect")
   
@@ -75,29 +98,6 @@ croxy.events.add_handler("outgoing-stanza/iq/"..xmlns_xmpp_proxy..":xmpp-proxy",
 
   return true
 end, 10)
-
-local function create_outgoing_connection(proxy_session, host, port)
-
-  local conn, handler = socket.tcp();
-	
-  if not conn then
-    proxy_session.log("error", "Could not create tcp socket")
-    return nil, nil
-  end
-
-  conn:settimeout(0);
-  local success, err = conn:connect(host, port);
-  if not success and err ~= "timeout" then
-    proxy_session.log("error", "could not connect to %s:%d: %s", host, port, err)
-	return nil, err;
-  end
-
-  proxy_session.log("debug", "created outgoing connection")
-  
-  conn = wrapclient(conn, host, port, xmppserver_listener, "*a");
-  
-  return conn, nil
-end
 
 croxy.events.add_handler("server-connected", function (proxy_session)
   local iq = st.iq({ type="set", to= proxy_session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag("connected"):up():up():up()

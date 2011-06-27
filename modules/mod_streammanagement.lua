@@ -5,6 +5,7 @@ local eventname_from_stanza = require "core.sessionmanager".eventname_from_stanz
 local proxy_sessions = require "core.sessionmanager".sessions["proxy"]
 local destroy_session = require "core.sessionmanager".destroy_session
 local datamanager = require "util.datamanager"
+local add_task = require "util.timer".add_task
 local os_time = os.time
 local math_min = math.min
 local t_remove = table.remove
@@ -13,6 +14,8 @@ local pairs, tonumber = paris, tonumber
 local sm_xmlns = 'urn:xmpp:sm:3';
 local sm_attrs = { xmlns = sm_xmlns };
 local sm_feature = st.stanza("sm", sm_attrs);
+
+local stream_ns = "http://etherx.jabber.org/"
 
 croxy.events.add_handler("session-created", function (session)
   if session.type ~= 'client' then
@@ -24,6 +27,25 @@ end, 10)
 
 croxy.events.add_handler("stream-features", function (session, features)
   features:add_child(sm_feature)
+end)
+
+croxy.events.add_handler("incoming-stanza/"..stream_ns.."streams:features", function (session, features)
+  -- Remove the sm feature
+  local bind_advertised = false
+
+  features:maptags(function (element)
+    if element.name == "bind" and element.attr.xmlns == "urn:ietf:params:xml:ns:xmpp-bind" then
+      bind_advertised = true
+    end
+
+    if element.name ~= "sm" and element.attr.xmlns ~= sm_xmlns then
+      return element
+    end
+  end)
+
+  if bind_advertised then
+    features:add_child(sm_feature)
+  end
 end)
 
 -- Session is a client or server session
@@ -44,21 +66,25 @@ function enable_sm(session)
     
     session.send = function (self, t)
       org_send(self, t)
-     
-      if t.type == 'stanza' and (t.attr.xmlns == nil or t.attr.xmlns == "jabber:client") then
+
+      if t.attr.xmlns == nil or t.attr.xmlns == "jabber:client" then
         session.queue[#session.queue + 1] = st.clone(t)
         
         if session.awaiting_ack ~= true then
           session.awaiting_ack = true
-          
-          org_send(self, st.stanza('r', sm_attrs))
+
+          -- Delay the actual sending to the next "cycle" to
+          -- get batches of stanzas better acknowledged
+          add_task(0, function ()
+            org_send(self, st.stanza('r', sm_attrs))
+          end)
         end
       end
     end
   end
 end 
 
-croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":enabled", function (session, stanza) 
+croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":enable", function (session, stanza)
   local enabled
   
   enabled = st.stanza('enabled', {xmlns = sm_xmlns, id=session.secret, resume='true'})
@@ -110,7 +136,9 @@ local function handle_ack(session, stanza)
   end
   
   session.last_acknowledged_stanza = session.last_acknowledged_stanza + handled_stanza_count;
-  
+
+  session.awaiting_ack = false
+
   return true
 end
 
@@ -123,13 +151,13 @@ croxy.events.add_handler("incoming-stanza/"..sm_xmlns..":a", function (proxy_ses
 end)
 
 croxy.events.add_handler("outgoing-stanza-prolog", function (proxy_session, stanza)
-  if proxy_session.client.sm_enabled == true then
+  if proxy_session.client.sm_enabled == true and (stanza.attr.xmlns == nil or stanza.attr.xmlns == "jabber:client") then
     proxy_session.client.handled_stanza_count = proxy_session.client.handled_stanza_count + 1
   end
 end)
 
 croxy.events.add_handler("incoming-stanza-prolog", function (proxy_session, stanza)
-  if proxy_session.server.sm_enabled == true then
+  if proxy_session.server.sm_enabled == true and (stanza.attr.xmlns == nil or stanza.attr.xmlns == "jabber:client") then
     proxy_session.server.handled_stanza_count = proxy_session.server.handled_stanza_count + 1
   end
 end)
