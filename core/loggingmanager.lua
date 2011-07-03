@@ -1,6 +1,6 @@
 
 local croxy = _G.croxy
-local string, require, print, ipairs, os, pcall, tostring = string, require, print, ipairs, os, pcall, tostring
+local string, require, print, ipairs, os, pcall, tostring, t_concat = string, require, print, ipairs, os, pcall, tostring, table.concat
 
 local termcolours = require "util.termcolours"
 local getstyle, getstring = termcolours.getstyle, termcolours.getstring
@@ -43,10 +43,15 @@ function log_sink(source_name, level, message, ...)
 
   local formatted_message;
 
-  local ok, err = pcall(string.format(message, ...))
+  local ok, err = pcall(function (...)
+    formatted_message = string.format(message, ...)
+  end, ...)
 
   if not ok then
-    formatted_message = string.format("Message formating failed. err: %s\nformat: %s\nargs: %s", tostring(err), tostring(message), tostring(...))
+    local args = {...}
+    local args_string = t_concat(args, ", ")
+
+    formatted_message = string.format("Message formating failed. err: %s\nformat: %s\nargs: %s", tostring(err), tostring(message), tostring(args_string))
   end
 
   local message = string.format("[%s] %15s [%s] %s", os.date(default_timestamp), source_name, level_string, formatted_message)
