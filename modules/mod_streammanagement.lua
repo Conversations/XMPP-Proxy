@@ -49,8 +49,8 @@ croxy.events.add_handler("incoming-stanza/"..stream_ns.."streams:features", func
 end)
 
 -- Session is a client or server session
-function enable_sm(session) 
-  if session.type ~= 'client' and session ~= 'server' then
+local function enable_sm(session)
+  if session.type ~= 'client' and session.type ~= 'server' then
     error('can not enable sm on '..session.type) 
   end
   
@@ -67,7 +67,7 @@ function enable_sm(session)
     session.send = function (self, t)
       org_send(self, t)
 
-      if t.attr.xmlns == nil or t.attr.xmlns == "jabber:client" then
+      if t.attr == nil or t.attr.xmlns == nil or t.attr.xmlns == "jabber:client" then
         session.queue[#session.queue + 1] = st.clone(t)
         
         if session.awaiting_ack ~= true then
@@ -266,7 +266,7 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
   source_proxy_session:set_client(nil)
   destroy_session(source_proxy_session)
 
-  proxy_session:set_server(client)
+  proxy_session:set_client(client)
   proxy_session.client_disconnected = nil
 
   enable_sm(proxy_session.client)
@@ -274,10 +274,12 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
   proxy_session.client.handled_stanza_count = sm_info.handled_stanza_count
   proxy_session.client.last_acknowledged_stanza = sm_info.last_acknowledged_stanza
 
-  local offline_stanzas = datamanager.list_load(session.secret, croxy.config['host'], 'offline-stanzas')
+  local offline_stanzas = datamanager.list_load(proxy_session.secret, croxy.config['host'], 'offline-stanzas')
+  -- Remove stored stanzas from disk
+  datamanager.list_store(proxy_session.secret, croxy.config['host'], 'offline-stanzas')
 
   if stanza.attr['h'] ~= nil then
-    local h = stanza.attr['h']
+    local h = tonumber(stanza.attr['h'])
 
     if h > proxy_session.client.last_acknowledged_stanza then
       -- The client has handled more stanzas than he was able to ack last time
@@ -306,12 +308,14 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
   -- Now send all stored stanzas
   proxy_session.log("info", "Client resumed. Send %d offline stanzas.", #offline_stanzas)
 
-  for _, stanza in ipars(offline_stanzas) do
-    stanza = stanza.deserialize(stanza)
+  for _, stanza in ipairs(offline_stanzas) do
+    stanza = st.deserialize(stanza)
 
     proxy_session.client:send(stanza)
   end
 
   croxy.events.fire_event("client-resumed", proxy_session)
   -- Done =)
+
+  return true
 end, 10)

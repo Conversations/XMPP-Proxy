@@ -12,8 +12,13 @@ if croxy.config['require-client-encryption'] then
 end
 
 croxy.events.add_handler("stream-features", function (session, features)
+  if croxy.config['client-tls-disabled'] == true then
+    session.log("warn", "Client tls support is disabled")
+    return
+  end
+
   -- Only add the tls feature if not already secured
-  if session.secure ~= true and false then
+  if session.secure ~= true then
     features:add_child(tls_feature);
 
     -- If we require tls only advertise it

@@ -224,8 +224,10 @@ function destroy_session(session)
   session.destroyed = true
   
   if session.type ~= "proxy" then
-    sessions[session.type][session.conn] = nil
-    session.conn.session = nil
+    if session.conn ~= nil then
+      sessions[session.type][session.conn] = nil
+      session.conn.session = nil
+    end
     session.stream = nil
     if session.type == "server" then
       session.proxy:set_server(nil)
