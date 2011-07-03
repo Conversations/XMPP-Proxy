@@ -38,7 +38,8 @@ croxy.events.add_handler("outgoing-stanza/"..xmlns_starttls..":starttls", functi
       verify = "none",
       options = {"all", "no_sslv2"},
       key = croxy.config['key'],
-      certificate = croxy.config['cert']
+      certificate = croxy.config['cert'],
+      ciphers = "ALL:!ADH:@STRENGTH"
     })
     proxy_session.client.secure = false
 
