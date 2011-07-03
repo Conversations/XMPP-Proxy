@@ -171,7 +171,7 @@ function new_proxy_session()
   setmetatable(session, proxy_session_mt)
   
   session.log = logger.init("p_"..tostring(session):match("[a-f0-9]+$"))
-  session.secret = random_string(40, "%a%d{)(%][%_-=+}:;\|")
+  session.secret = random_string(40, "%a%d{)(%][_-=+}:;\|")
   
   ---
   -- Insert the session in our session table.
