@@ -1,6 +1,6 @@
 
 local croxy = _G.croxy
-local string, require, print, ipairs, os = string, require, print, ipairs, os
+local string, require, print, ipairs, os, pcall, tostring = string, require, print, ipairs, os, pcall, tostring
 
 local termcolours = require "util.termcolours"
 local getstyle, getstring = termcolours.getstyle, termcolours.getstring
