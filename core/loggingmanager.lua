@@ -40,8 +40,16 @@ function log_sink(source_name, level, message, ...)
   elseif level == "error" then level_string = getstring(style_error, "E")
   elseif level == "critical" then level_string = getstring(style_error, "C")
   end
-  
-  local message = string.format("[%s] %15s [%s] %s", os.date(default_timestamp), source_name, level_string, string.format(message, ...))
+
+  local formatted_message;
+
+  local ok, err = pcall(string.format(message, ...))
+
+  if not ok then
+    formatted_message = string.format("Message formating failed. err: %s\nformat: %s\nargs: %s", tostring(err), tostring(message), tostring(...))
+  end
+
+  local message = string.format("[%s] %15s [%s] %s", os.date(default_timestamp), source_name, level_string, formatted_message)
   
   print (message)
 end
