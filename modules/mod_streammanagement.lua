@@ -231,7 +231,7 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
 
     source_proxy_session.client:send(st.stanza("failed", sm_attrs):tag("unexpected-request", {xmlns = "urn:ietf:params:xml:ns:xmpp-stanzas"}))
 
-    return
+    return true
   end
 
   local proxy_session_id = stanza.attr['previd']
@@ -242,7 +242,7 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
 
     source_proxy_session.client:send(st.stanza("failed", sm_attrs):tag("item-not-found", {xmlns = "urn:ietf:params:xml:ns:xmpp-stanzas"}))
 
-    return
+    return true
   end
 
   if proxy_session.client_disconected ~= true then
@@ -257,7 +257,7 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
     proxy_session.server:disconnect()
     destroy_session(proxy_session)
 
-    return
+    return true
   end
 
   -- Reconnect the client to the resumed proxy_session
