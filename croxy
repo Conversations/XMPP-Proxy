@@ -154,12 +154,10 @@ function loop()
 		if type(err) == "string" and err:match("interrupted!$") then
 			return "quitting";
 		end
-		
-		log("error", "Top-level error, please report:\n%s", tostring(err));
-		local traceback = debug.traceback("", 2);
-		if traceback then
-			log("error", "%s", traceback);
-		end
+
+        local traceback = debug.traceback();
+
+		log("error", "Top-level error, please report:\n%s\n%s", tostring(err), tostring(traceback));
 	end
 	
 	while select(2, xpcall(server.loop, catch_uncaught_error)) ~= "quitting" do
