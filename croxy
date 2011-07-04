@@ -97,15 +97,16 @@ local function load_config()
 
   local function incoperate_defaults(config, defaults)
     for key, value in pairs(config) do
-      if defaults[key] ~= nil and type(config[key]) == "table"
-         and type(defaults[key]) == "table" then
+      if defaults[key] ~= nil and type(config[key]) == "table" and type(defaults[key]) == "table" then
         incoperate_defaults(config[key], defaults[key])
       end
     end
 
-    setmetatable(config, {
-      __index = defaults
-    })
+    for key, value in pairs(defaults) do
+      if config[key] == nil then
+        config[key] = defaults[key]
+      end
+    end
   end
 
   incoperate_defaults(croxy.config, defaults)
