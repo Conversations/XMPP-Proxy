@@ -131,7 +131,7 @@ croxy.events.add_handler("validate-config", function (croxy_config)
     error("No ssl key found for the server context.")
   end
 
-  if croxy_config["ssl"]["server"]["cert"] == nil then
+  if croxy_config["ssl"]["server"]["certificate"] == nil then
     error("No ssl cert found for the server context.")
   end
 
