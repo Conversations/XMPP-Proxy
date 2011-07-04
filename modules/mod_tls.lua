@@ -110,8 +110,8 @@ croxy.events.add_handler("register-config-defaults", function (config_defaults)
   }
 end)
 
-croxy.events.add_handler("validate-config", function (config)
-  config = {
+croxy.events.add_handler("validate-config", function (croxy_config)
+  local config = {
     server = {
       mode = "server",
       protocol = "tlsv1",
@@ -127,19 +127,19 @@ croxy.events.add_handler("validate-config", function (config)
     }
   }
 
-  if config["ssl"]["server"]["key"] == nil then
+  if croxy_config["ssl"]["server"]["key"] == nil then
     error("No ssl key found for the server context.")
   end
 
-  if config["ssl"]["server"]["cert"] == nil then
+  if croxy_config["ssl"]["server"]["cert"] == nil then
     error("No ssl cert found for the server context.")
   end
 
-  for key, value in pairs(config["ssl"]["server"]) do
-    config["server"][key] = config["ssl"]["server"][key]
+  for key, value in pairs(croxy_config["ssl"]["server"]) do
+    config["server"][key] = croxy_config["ssl"]["server"][key]
   end
 
-  local ctx, err = ssl.newcontext(config["ssl"]["server"])
+  local ctx, err = ssl.newcontext(config["server"])
 
   if ctx ~= nil then
     server_ssl_ctx = ctx
@@ -147,11 +147,11 @@ croxy.events.add_handler("validate-config", function (config)
     error("Could not create server ssl context: "..err)
   end
 
-  for key, value in pairs(config["ssl"]["client"]) do
-    config["client"][key] = config["ssl"]["client"][key]
+  for key, value in pairs(croxy_config["ssl"]["client"]) do
+    config["client"][key] = croxy_config["ssl"]["client"][key]
   end
 
-  ctx, err = ssl.newcontext(config["ssl"]["client"])
+  ctx, err = ssl.newcontext(config["client"])
 
   if ctx ~= nil then
     client_ssl_ctx = ctx
