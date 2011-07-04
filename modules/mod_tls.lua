@@ -135,7 +135,7 @@ croxy.events.add_handler("validate-config", function (croxy_config)
     error("No ssl cert found for the server context.")
   end
 
-  for key, value in pairs(croxy_config["ssl"]["server"]) do
+  for key, value in pairs(croxy_config["ssl"]["server"] or {}) do
     config["server"][key] = croxy_config["ssl"]["server"][key]
   end
 
@@ -147,7 +147,7 @@ croxy.events.add_handler("validate-config", function (croxy_config)
     error("Could not create server ssl context: "..err)
   end
 
-  for key, value in pairs(croxy_config["ssl"]["client"]) do
+  for key, value in pairs(croxy_config["ssl"]["client"] or {}) do
     config["client"][key] = croxy_config["ssl"]["client"][key]
   end
 
