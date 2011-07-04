@@ -7,9 +7,11 @@ local stream_ns = "http://etherx.jabber.org/"
 local starttls_attr = { xmlns = xmlns_starttls };
 local tls_feature = st.stanza("starttls", starttls_attr);
 
-if croxy.config['require-client-encryption'] then
-  tls_feature:tag("required"):up();
+croxy.events.add_handler("proxy-starting", function ()
+  if croxy.config['require-client-encryption'] then
+    tls_feature:tag("required"):up();
 end
+end)
 
 croxy.events.add_handler("stream-features", function (session, features)
   if croxy.config['client-tls-disabled'] == true then

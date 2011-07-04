@@ -9,7 +9,6 @@ local events
 local server
 local socket
 local datamanager
-local luasec
 
 --
 -- Loading functions for setup
@@ -27,11 +26,11 @@ local function load_libraries()
     -- therefore disallow loading
     ---
 
-    luasec = require "ssl"
 	socket = require "socket"
 	server = require "net.server"
 	datamanager = require "util.datamanager"
-	
+
+    require "ssl"
 	require "util.xmppstream"
 	require "util.random_string"
 	require "util.datetime"
@@ -89,8 +88,6 @@ local function load_config()
     c()
   end
 
-  croxy.events.fire_event("validate-config", croxy.config)
-
   datamanager.set_data_path('./data')
   
   ---
@@ -110,6 +107,8 @@ local function load_config()
   	  error("Attempt to set a new config var: "..tostring(k).." = "..tostring(v), 2)
   	end
   })
+
+  croxy.events.fire_event("validate-config", croxy.config)
   
 end
 
@@ -183,10 +182,10 @@ load_luarocks()
 load_events()
 load_libraries()
 load_logging()
-load_config()
-seed_random()
-
 load_modules()
+load_config()
+
+seed_random()
 
 ---
 -- Set local variables, they'll be used in
