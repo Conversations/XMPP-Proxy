@@ -1,11 +1,17 @@
 
 local croxy = _G.croxy
 local st = require "util.stanza"
+local ssl = require "ssl"
 
 local xmlns_starttls = 'urn:ietf:params:xml:ns:xmpp-tls';
 local stream_ns = "http://etherx.jabber.org/"
 local starttls_attr = { xmlns = xmlns_starttls };
 local tls_feature = st.stanza("starttls", starttls_attr);
+
+-- The server context is used when the proxy acts as server
+-- therefore its used with client connections
+local server_ssl_ctx
+local client_ssl_ctx
 
 croxy.events.add_handler("proxy-starting", function ()
   if croxy.config['require-client-encryption'] then
@@ -34,15 +40,7 @@ end, 100)
 croxy.events.add_handler("outgoing-stanza/"..xmlns_starttls..":starttls", function (proxy_session, features)
   if proxy_session.client.secure ~= true then
     proxy_session.client:send(st.stanza("proceed", starttls_attr))
-    proxy_session.client.conn:starttls({
-      mode = "server",
-      protocol = "tlsv1",
-      verify = "none",
-      options = {"all", "no_sslv2"},
-      key = croxy.config['key'],
-      certificate = croxy.config['cert'],
-      ciphers = "ALL:!ADH:@STRENGTH"
-    })
+    proxy_session.client.conn:starttls(server_ssl_ctx)
     proxy_session.client.secure = false
 
     -- Reset the stream
@@ -88,15 +86,52 @@ croxy.events.add_handler("incoming-stanza/"..stream_ns.."streams:features", func
 end, 10)
 
 croxy.events.add_handler("incoming-stanza/"..xmlns_starttls..":proceed", function (session, stanza)
-  session.server.conn:starttls({
-    mode = "client",
-    protocol = "tlsv1",
-    verify = "peer",
-    options = "all",
-  })
+  session.server.conn:starttls(client_ssl_ctx)
   session.server.secure = false
  
   return true
 end)
 
--- -- Use high priority
+croxy.events.add_handler("register-config-defaults", function (config_defaults)
+  config_defaults["ssl"] = {
+    server = {
+      mode = "server",
+      protocol = "tlsv1",
+      verify = "none",
+      options = {"all", "no_sslv2"},
+      ciphers = "ALL:!ADH:@STRENGTH"
+    },
+    client = {
+      mode = "client",
+      protocol = "tlsv1",
+      verify = "peer",
+      options = "all"
+    }
+  }
+end)
+
+croxy.events.add_handler("validate-config", function (config)
+  if config["ssl"]["server"]["key"] == nil then
+    error("No ssl key found for the server context.")
+  end
+
+  if config["ssl"]["server"]["cert"] == nil then
+    error("No ssl cert found for the server context.")
+  end
+
+  local ctx, err = ssl.newcontext(config["ssl"]["server"])
+
+  if ctx ~= nil then
+    server_ssl_ctx = ctx
+  else
+    error("Could not create server ssl context: "..err)
+  end
+
+  ctx, err = ssl.newcontext(config["ssl"]["client"])
+
+  if ctx ~= nil then
+    client_ssl_ctx = ctx
+  else
+    error("Could not create client ssl context: "..err)
+  end
+end)
