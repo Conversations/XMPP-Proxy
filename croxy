@@ -94,13 +94,28 @@ local function load_config()
   -- Make the config imutable and
   -- complain about access to none-existent variables
   ---
-  
+
+  local function incoperate_defaults(config, defaults)
+    for key, value in pairs(config) do
+      if defaults[key] ~= nil and type(config[key]) == "table"
+         and type(defaults[key]) == "table" then
+        incoperate_defaults(config[key], defaults[key])
+      end
+    end
+
+    setmetatable(config, {
+      __index = defaults
+    })
+  end
+
+  incoperate_defaults(croxy.config, defaults)
+
   setmetatable(defaults, {
     __index = function (t, k)
       log("warn", "%s", debug.traceback("Attempt to access non-existent config var '"..tostring(k).."'", 2))
-    end 
-  }) 
-  
+    end
+  })
+
   setmetatable(croxy.config, {
     __index = defaults,
   	__newindex = function (t, k, v)
