@@ -26,11 +26,11 @@ local function load_libraries()
     -- therefore disallow loading
     ---
 
+    ssl = require "ssl"
 	socket = require "socket"
 	server = require "net.server"
 	datamanager = require "util.datamanager"
 
-    require "ssl"
 	require "util.xmppstream"
 	require "util.random_string"
 	require "util.datetime"
