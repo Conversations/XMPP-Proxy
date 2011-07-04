@@ -111,6 +111,22 @@ croxy.events.add_handler("register-config-defaults", function (config_defaults)
 end)
 
 croxy.events.add_handler("validate-config", function (config)
+  config = {
+    server = {
+      mode = "server",
+      protocol = "tlsv1",
+      verify = "none",
+      options = {"all", "no_sslv2"},
+      ciphers = "ALL:!ADH:@STRENGTH"
+    },
+    client = {
+      mode = "client",
+      protocol = "tlsv1",
+      verify = "peer",
+      options = "all"
+    }
+  }
+
   if config["ssl"]["server"]["key"] == nil then
     error("No ssl key found for the server context.")
   end
@@ -119,12 +135,20 @@ croxy.events.add_handler("validate-config", function (config)
     error("No ssl cert found for the server context.")
   end
 
+  for key, value in pairs(config["ssl"]["server"]) do
+    config["server"][key] = config["ssl"]["server"][key]
+  end
+
   local ctx, err = ssl.newcontext(config["ssl"]["server"])
 
   if ctx ~= nil then
     server_ssl_ctx = ctx
   else
     error("Could not create server ssl context: "..err)
+  end
+
+  for key, value in pairs(config["ssl"]["client"]) do
+    config["client"][key] = config["ssl"]["client"][key]
   end
 
   ctx, err = ssl.newcontext(config["ssl"]["client"])

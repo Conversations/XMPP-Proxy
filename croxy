@@ -95,22 +95,6 @@ local function load_config()
   -- complain about access to none-existent variables
   ---
 
-  local function incoperate_defaults(config, defaults)
-    for key, value in pairs(config) do
-      if defaults[key] ~= nil and type(config[key]) == "table" and type(defaults[key]) == "table" then
-        incoperate_defaults(config[key], defaults[key])
-      end
-    end
-
-    for key, value in pairs(defaults) do
-      if config[key] == nil then
-        config[key] = defaults[key]
-      end
-    end
-  end
-
-  incoperate_defaults(croxy.config, defaults)
-
   setmetatable(defaults, {
     __index = function (t, k)
       log("warn", "%s", debug.traceback("Attempt to access non-existent config var '"..tostring(k).."'", 2))
