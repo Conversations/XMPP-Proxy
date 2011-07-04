@@ -64,14 +64,6 @@ function xmppserver.onconnect(conn)
   
   conn:setoption('keepalive', true)
   
-  function whitespace_keepalive()
-      session:send(" ")
-      session.log("debug", "whitespace keepalive")
-      add_task(5*60, whitespace_keepalive)
-  end
-  
-  add_task(5*60, whitespace_keepalive)
-  
   croxy.events.fire_event('server-connected', session.proxy)
 end
 
@@ -96,6 +88,8 @@ function xmppserver.ondisconnect(conn, err)
   conn.session =  nil
   
   session.log("info", "Disconnected from Server")
+
+  croxy.events.fire_event('server-disconnected', session.proxy)
 end
 
 function xmppserver.onstatus(conn, status)

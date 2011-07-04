@@ -9,17 +9,18 @@ local events
 local server
 local socket
 local datamanager
+local luasec
 
 --
 -- Loading functions for setup
 --
-function load_luarocks()
+local function load_luarocks()
   --- load luarocks, for development we need this
   --- to get all modules
   pcall(require, "luarocks.loader")
 end
 
-function load_libraries()
+local function load_libraries()
     ---
     -- Load all the modules here, because
     -- globals will be locked later and
@@ -42,26 +43,26 @@ function load_libraries()
 	require "net.xmppserver_listener"
 end
 
-function load_events()
+local function load_events()
   local events = require("util.events")
   _G.croxy.events = events.new()
 end
 
-function load_logging()
+local function load_logging()
   require("core.loggingmanager")
 end
 
-function setup_xmppclient()
+local function setup_xmppclient()
   local xmppclient_listener = require "net.xmppclient_listener"
   
   server.addserver("*", 5000, xmppclient_listener, "*a", false, false)
 end
 
-function seed_random()
+local function seed_random()
   math.randomseed( tonumber(tostring(os.time()):reverse():sub(1,6)) )
 end
 
-function load_config()
+local function load_config()
   ---
   -- Create an config table
   ---
@@ -77,15 +78,19 @@ function load_config()
   defaults["require-client-encryption"] = true -- Only accept connections encrypted via tls
   defaults["client-tls-disabled"] = false
 
+  croxy.events.fire_event("register-config-defaults", defaults)
+
   ---
   -- Load config
   ---
-  local c = loadfile("config.conf")
+  local c, err = loadfile("config.conf")
   if c ~= nil then
     setfenv(c, croxy.config)
     c()
   end
-  
+
+  croxy.events.fire_event("validate-config", croxy.config)
+
   datamanager.set_data_path('./data')
   
   ---
@@ -108,17 +113,18 @@ function load_config()
   
 end
 
-function load_modules()
+local function load_modules()
   require "modules.mod_tls"
   require "modules.mod_xmpp_proxy"
   require "modules.mod_notifications"
   require "modules.mod_streammanagement"
+  require "modules.mod_keepalive"
 end
 
 ---
 -- Stolen from prosody
 ---
-function init_global_protection()
+local function init_global_protection()
 	-- Catch global accesses
 	local locked_globals_mt = {
 		__index = function (t, k)
@@ -144,7 +150,7 @@ end
 ---
 --- Run functions
 ---
-function loop()
+local function loop()
   ---
   -- Catch an interrupted error here
   -- and return quitting to end the loop.
@@ -165,7 +171,7 @@ function loop()
 	end
 end
 
-function cleanup()
+local function cleanup()
   log("info", "Proxy stopping.")
   events.fire_event('proxy-stopping')
 

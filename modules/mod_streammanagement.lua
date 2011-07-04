@@ -274,7 +274,7 @@ croxy.events.add_handler("outgoing-stanza/"..sm_xmlns..":resume", function (sour
   proxy_session.client.handled_stanza_count = sm_info.handled_stanza_count
   proxy_session.client.last_acknowledged_stanza = sm_info.last_acknowledged_stanza
 
-  local offline_stanzas = datamanager.list_load(proxy_session.secret, croxy.config['host'], 'offline-stanzas')
+  local offline_stanzas = datamanager.list_load(proxy_session.secret, croxy.config['host'], 'offline-stanzas') or {}
   -- Remove stored stanzas from disk
   datamanager.list_store(proxy_session.secret, croxy.config['host'], 'offline-stanzas')
 
