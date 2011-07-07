@@ -189,7 +189,7 @@ local function dispatch_offline_stanza(proxy_session, stanza)
 end
 
 croxy.events.add_handler("client-disconnected", function (session)
-  if session.client.sm_enabled == true or true then
+  if session.client.sm_enabled == true and session.client.disconnect_reason ~= "stream-closed" then
     session.client_disconnected = true
   
     ---

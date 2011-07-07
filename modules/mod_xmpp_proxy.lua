@@ -117,15 +117,18 @@ croxy.events.add_handler("server-stream-error", function (proxy_session, error)
   ---
   --  The server stream failed, fail the client stream too...
   ---
+
+
+  if proxy_session.client_disconnected ~= true then
+    local stanza = st.stanza("stream:error")
   
-  local stanza = st.stanza("stream:error")
+    for _, child in ipairs(error.tags) do
+      stanza:add_child(child):up()
+    end
   
-  for _, child in ipairs(error.tags) do
-    stanza:add_child(child):up()
+    proxy_session.client:send(stanza)
+    proxy_session.client:close()
   end
-  
-  proxy_session.client:send(stanza)
-  proxy_session.client:close()
 end)
 
 ---

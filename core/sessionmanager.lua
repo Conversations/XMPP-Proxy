@@ -337,6 +337,7 @@ function streamopened_server(session, attr)
 end
 
 function streamclosed(session)
+  session.disconnect_reason = "stream-closed";
   session.log("info", "Stream closed")
   session:close()
 end
