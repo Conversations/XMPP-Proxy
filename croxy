@@ -54,7 +54,7 @@ end
 local function setup_xmppclient()
   local xmppclient_listener = require "net.xmppclient_listener"
   
-  server.addserver("*", 5000, xmppclient_listener, "*a", false, false)
+  server.addserver("*", croxy.config['port'], xmppclient_listener, "*a", false, false)
 end
 
 local function seed_random()
