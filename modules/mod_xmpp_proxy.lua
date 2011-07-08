@@ -83,11 +83,8 @@ croxy.events.add_handler("outgoing-stanza/iq/"..xmlns_xmpp_proxy..":xmpp-proxy",
   end
   
   local xmpp_proxy_element = stanza.tags[1]
-  local action_element
   
-  action_element = xmpp_proxy_element:get_child("connect")
-  
-  if action_element ~= nil then
+  if xmpp_proxy_element:get_child("connect") ~= nil then
     handle_connect_stanza(proxy_session, stanza)
     
     return true
@@ -99,16 +96,54 @@ croxy.events.add_handler("outgoing-stanza/iq/"..xmlns_xmpp_proxy..":xmpp-proxy",
   return true
 end, 10)
 
+
+croxy.events.add_handler("outcoming-stanza/iq", function (proxy_session, stanza)
+  -- This stanza is not addressed to us, so leave it alone
+  if not (stanza.attr.to == croxy.config['host'] and (stanza.attr.type == "result" or stanza.attr.type == "error"))  then
+    return nil
+  end
+
+  local xmpp_proxy_element = stanza:get_child("xmpp-proxy", xmlns_xmpp_proxy)
+
+  if xmpp_proxy_element:get_child("certificate-trust") ~= nil then
+    local trusted = false
+
+    if xmpp_proxy_element:get_child("certificate-trust"):get_child("trusted") then
+      trusted = true
+    end
+
+    croxy.events.fire_event("server-verified-cert", proxy_session, trusted)
+
+    return true
+  end
+end)
+
 croxy.events.add_handler("server-connected", function (proxy_session)
-  local iq = st.iq({ type="set", to= proxy_session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag("connected"):up():up():up()
-    
+  local iq
+
+  iq = st.iq({ type="set", to=proxy_session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr):tag("server-certificate"):text(proxy_session.server.conn:getpeercertificate():pem()):up():up():up()
+  proxy_session.client:send(iq)
+  iq = st.iq({ type="set", to= proxy_session.client.from }):tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag("connected"):up():up():up()
+  proxy_session.client:send(iq)
+
   proxy_session.server.notopen = true
   proxy_session.server.stream:reset()
   proxy_session.server.connected = true
-  proxy_session.client:send(iq)
   proxy_session.client.notopen = true
   proxy_session.client.stream:reset()
   proxy_session.client.allows_stream_restarts = true
+
+  return true
+end)
+
+croxy.events.add_handler("sever-verify-cert", function (proxy_session, certificate)
+  local iq
+
+  iq = st.iq({ type="get", to=proxy_session.client.from })
+
+  iq:tag("xmpp-proxy", xmpp_proxy_attr):tag("certificate-trust"):text(certificate:pem()):up():up():up()
+
+  proxy_session.client:send(iq)
 
   return true
 end)

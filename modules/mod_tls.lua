@@ -72,8 +72,35 @@ croxy.events.add_handler("server-connected", function (session)
     session.server:send_opening()
     
     return true
+  elseif session.server.secure and session.server.conn:getpeerchainvalid() == false
+          and session.server.should_trust_cert == nil then
+    session.log("debug", "Could not verify server certificate. Ask the client...")
+
+    local handled = croxy.events.fire_event("server-verify-cert", session, session.server.conn:getpeercertificate())
+
+    if handled ~= true then
+      session.server.should_trust_cert = false
+    else
+      -- Someone handled the verify request. They will come back once they decided
+      return true
+    end
+  end
+
+  if session.server.secure and session.server.conn:getpeerchainvalid() == false
+          and session.server.should_trust_cert ~= true then
+    -- TODO disconnect server, cert is not to be trusted
+    session.log("info", "Server certificate is not to be trusted!")
   end
 end, 10)
+
+croxy.events.add_handler("server-verified-cert", function (proxy_session, trusted)
+  proxy_session.server.should_trust_cert = trusted
+
+  -- Fake the server connected event
+  croxy.events.fire_event("server-connected", proxy_session)
+
+  return true
+end)
 
 croxy.events.add_handler("incoming-stanza/"..stream_ns.."streams:features", function (session, features)
   if not session.server.secure and features:child_with_ns(xmlns_starttls) then
@@ -122,7 +149,7 @@ croxy.events.add_handler("validate-config", function (croxy_config)
     client = {
       mode = "client",
       protocol = "tlsv1",
-      verify = "peer",
+      verify = {"peer", "continue"},
       options = "all"
     }
   }
