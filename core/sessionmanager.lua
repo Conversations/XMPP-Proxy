@@ -405,6 +405,12 @@ function outgoing_stanza_route(proxy_session, stanza)
     proxy_session.log("error", "not connected")
     return
   end
+
+  if stanza.attr.to == croxy.config['host'] then
+    proxy_session.log("error", "Stanza adressed to us was about to being routed to the server: %s", stanza:pretty_print())
+
+    return true
+  end
   
   proxy_session.server:send(stanza)
   

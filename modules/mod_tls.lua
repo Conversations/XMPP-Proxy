@@ -78,11 +78,11 @@ croxy.events.add_handler("server-connected", function (session)
 
     local handled = croxy.events.fire_event("server-verify-cert", session, session.server.conn:getpeercertificate())
 
-    if handled ~= true then
-      session.server.should_trust_cert = false
-    else
-      -- Someone handled the verify request. They will come back once they decided
+    if handled == true then
       return true
+    else
+      session.log("info", "Verify request not handled...")
+      session.server.should_trust_cert = false
     end
   end
 
@@ -90,6 +90,8 @@ croxy.events.add_handler("server-connected", function (session)
           and session.server.should_trust_cert ~= true then
     -- TODO disconnect server, cert is not to be trusted
     session.log("info", "Server certificate is not to be trusted!")
+
+    return true
   end
 end, 10)
 

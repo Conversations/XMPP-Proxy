@@ -609,8 +609,12 @@ wrapconnection = function( server, listeners, socket, ip, serverport, clientport
 				handler.starttls = nil
 				needtls = nil
 
-                handler.getpeercertificate = socket.getpeercertificate
-                handler.getpeerchainvalid = socket.getpeerchainvalid
+                handler.getpeercertificate = function ()
+                  return socket:getpeercertificate()
+                end
+                handler.getpeerchainvalid = function ()
+                  return socket:getpeerchainvalid()
+                end
 
 				-- Secure now
 				ssl = true
