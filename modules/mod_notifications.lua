@@ -19,31 +19,32 @@ croxy.events.add_handler('outgoing-stanza/iq/'..notifications_xmlns..':notificat
 -- </iq>
 ---
 
-    local gateway = stanza.tags[1]:get_child_text('gateway')
-    local user_identifier = stanza.tags[1]:get_child_text('user-identifier')
-    local notify_content = stanza.tags[1]:get_child('notify-content')
+  local gateway = stanza.tags[1]:get_child_text('gateway')
+  local user_identifier = stanza.tags[1]:get_child_text('user-identifier')
+  local notify_content = stanza.tags[1]:get_child('notify-content')
     
-    session.notification_gateway = {}
+  session.notification_gateway = {}
     
-    session.notification_gateway.gateway = gateway
-    session.notification_gateway.user_identifier = user_identifier
+  session.notification_gateway.gateway = gateway
+  session.notification_gateway.user_identifier = user_identifier
+
+  session.log("debug", "gateway %s and user-identifier %s", gateway, user_identifier)
     
+  if notify_content:get_child('from') ~= nil then
+    session.notification_gateway.sendFrom = true
+  else
+    session.notification_gateway.sendFrom = false
+  end
     
-    session.log("debug", "gateway %s and user-identifier %s", gateway, user_identifier)
+  if notify_content:get_child('body') ~= nil then
+    session.notification_gateway.sendBody = true
+  else
+    session.notification_gateway.sendBody = false
+  end
     
-    if notify_content:get_child('from') ~= nil then
-        session.notification_gateway.sendFrom = true
-    else
-        session.notification_gateway.sendFrom = false
-    end
-    
-    if notify_content:get_child('body') ~= nil then
-        session.notification_gateway.sendBody = true
-    else
-        session.notification_gateway.sendBody = false
-    end
-    
-    session.client:send(st.reply(stanza))
+  session.client:send(st.reply(stanza))
+
+  return true
 end)
 
 croxy.events.add_handler("offline-stanza/message", function (session, stanza)
