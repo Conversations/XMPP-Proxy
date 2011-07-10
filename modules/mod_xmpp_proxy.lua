@@ -10,6 +10,21 @@ local xmlns_xmpp_proxy = 'urn:conversations:xmpp-proxy';
 local xmpp_proxy_attr = { xmlns = xmlns_xmpp_proxy };
 local xmpp_proxy_feature = st.stanza("xmpp-proxy", xmpp_proxy_attr);
 
+local function status_stanza(to, status, status_xmlns, text)
+  local iq
+
+  iq = st.iq({ type="set", to= to, from = croxy.config['host']})
+  iq:tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag(status, {xmlns = status_xmlns})
+
+  if text ~= nil then
+    iq:tag("text"):text(text):up():up()
+  end
+
+  iq:up():up():up()
+
+  return iq
+end
+
 local function create_outgoing_connection(proxy_session, host, port)
 
   local conn, handler = socket.tcp();
@@ -125,10 +140,11 @@ end)
 croxy.events.add_handler("server-connected", function (proxy_session)
   local iq
 
+
   iq = st.iq({ type="set", to=proxy_session.client.from, from = croxy.config['host']}):tag("xmpp-proxy", xmpp_proxy_attr):tag("server-certificate"):text(proxy_session.server.conn:getpeercertificate():pem()):up():up():up()
   proxy_session.client:send(iq)
-  iq = st.iq({ type="set", to= proxy_session.client.from, from = croxy.config['host']}):tag("xmpp-proxy", xmpp_proxy_attr):tag("status"):tag("connected"):up():up():up()
-  proxy_session.client:send(iq)
+
+  proxy_session.client:send(status_stanza(proxy_session.client.from, "connected"))
 
   -- Don't reset streams yet, we're expecting results from above
   proxy_session.server.connected = true
@@ -154,6 +170,7 @@ croxy.events.add_handler("server-stream-error", function (proxy_session, error)
   --  The server stream failed, fail the client stream too...
   ---
 
+  proxy_session.client:send(status_stanza(proxy_session.client.from, "disconnected"))
 
   if proxy_session.client_disconnected ~= true then
     local stanza = st.stanza("stream:error")
