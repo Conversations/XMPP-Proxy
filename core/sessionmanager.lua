@@ -63,12 +63,17 @@ local function log_session_statistic(log, type)
 
   for _, key in ipairs({'client', 'proxy', 'server'}) do
     local style
+    local number_of_sessions = 0
 
     if type == key then
       style = termcolours.getstyle('red')
     end
 
-    status_strings[_] = termcolours.getstring(style, s_format("%d (%d)", #sessions[key], allocated_sessions_count[key]))
+    for _, __ in pairs(sessions['key']) do
+      number_of_sessions = number_of_sessions + 1
+    end
+
+    status_strings[_] = termcolours.getstring(style, s_format("%s %d (%d)", tostring(key), number_of_sessions, allocated_sessions_count[key]))
   end
 
   log("info", "Sessions: "..t_concat(status_strings, " "))
