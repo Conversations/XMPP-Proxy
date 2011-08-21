@@ -1,16 +1,16 @@
 
-local require, ipairs, type, error = require, ipairs, type, error
+local require, pairs, type, error = require, pairs, type, error
 
 local croxy = _G.croxy
 local sessions = require "core.sessionmanager".sessions
 local add_task = require "util.timer".add_task
 
 local function send_whitespace_keepalive()
-  for _, session in ipairs(sessions["server"]) do
+  for _, session in pairs(sessions["server"]) do
     session:send(" ")
   end
 
-  for _, session in ipairs(sessions["client"]) do
+  for _, session in pairs(sessions["client"]) do
     session:send(" ")
   end
 

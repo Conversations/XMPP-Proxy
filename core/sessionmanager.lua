@@ -10,6 +10,9 @@ local random_string = require "util.random_string"
 local st = require "util.stanza"
 local uuid_generate = require "util.uuid".generate
 local traverse = require "util.traverse"
+local termcolours = require "util.termcolours"
+local s_format = string.format
+local t_concat = table.concat
 
 local print = print
 
@@ -54,6 +57,22 @@ Client       +--------------------------------Proxy----------------------+      
 ]]--
 
 local default_stream_attr = { ["xmlns:stream"] = "http://etherx.jabber.org/streams", xmlns = "jabber:client", version = "1.0", id = "" };
+
+local function log_session_statistic(log, type)
+  local status_strings = {}
+
+  for _, key in ipairs({'client', 'proxy', 'server'}) do
+    local style
+
+    if type == key then
+      style = termcolours.getstyle('red')
+    end
+
+    status_strings['key'] = termcolours.getstring(style, s_format("%d (%d)", #sessions[key], allocated_sessions_count[key]))
+  end
+
+  log("info", "Sessions: "..t_concat(status_strings, " "))
+end
 
 session_mt = {}
 session_mt.__index = session_mt
@@ -102,22 +121,6 @@ function new_session(conn, type, proxy_session)
 
   session.log = logger.init(logname)
 
-  if true then
-    -- For debugging how many sessions are allocated
-    local log = session.log
-
-    session.trace = newproxy(true);
-    getmetatable(session.trace).__gc = function ()
-      allocated_sessions_count[type] = allocated_sessions_count[type] - 1
-      log("debug", "Deallocated session. Now %d allocated and %d open sessions of type %s exists.",
-        allocated_sessions_count[type], #sessions[type], type)
-    end
-    allocated_sessions_count[type] = allocated_sessions_count[type] + 1
-  
-    log("debug", "Now %d allocated and %d open sessions of type %s exists",
-      allocated_sessions_count[type], #sessions[type], type)
-  end
-  
   ---
   -- If the caller didn't pass an proxy_session
   -- we need to create it now.
@@ -133,8 +136,23 @@ function new_session(conn, type, proxy_session)
   ---
   -- Register the session for later finding
   ---
-  sessions["client"][conn] = session
-  
+  sessions[type][conn] = session
+
+  if true then
+    -- For debugging how many sessions are allocated
+    local log = session.log
+
+    session.trace = newproxy(true);
+    getmetatable(session.trace).__gc = function ()
+      allocated_sessions_count[type] = allocated_sessions_count[type] - 1
+
+      log_session_statistic(log, type)
+    end
+    allocated_sessions_count[type] = allocated_sessions_count[type] + 1
+
+    log_session_statistic(log, type)
+  end
+
   croxy.events.fire_event('session-created', session)
   
   return session
@@ -179,6 +197,8 @@ function new_proxy_session()
   ---
 
   sessions["proxy"][session.secret] = session
+
+  log_session_statistic(session.log, 'proxy')
     
   return session
 end
