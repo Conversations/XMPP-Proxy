@@ -69,7 +69,7 @@ local function log_session_statistic(log, type)
       style = termcolours.getstyle('red')
     end
 
-    for _, __ in pairs(sessions['key']) do
+    for _, __ in pairs(sessions[key]) do
       number_of_sessions = number_of_sessions + 1
     end
 
