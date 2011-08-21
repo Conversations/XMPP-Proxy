@@ -68,7 +68,7 @@ local function log_session_statistic(log, type)
       style = termcolours.getstyle('red')
     end
 
-    status_strings['key'] = termcolours.getstring(style, s_format("%d (%d)", #sessions[key], allocated_sessions_count[key]))
+    status_strings[_] = termcolours.getstring(style, s_format("%d (%d)", #sessions[key], allocated_sessions_count[key]))
   end
 
   log("info", "Sessions: "..t_concat(status_strings, " "))
